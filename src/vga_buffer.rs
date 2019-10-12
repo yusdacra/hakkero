@@ -13,6 +13,11 @@ lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
         color_code: ColorCode::new(Color::Yellow, Color::Black),
+        cursor: {
+            let mut cur = Cursor::new(1);
+            cur.set_state(true);
+            cur
+        },
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
@@ -52,6 +57,58 @@ impl ColorCode {
     }
 }
 
+use x86_64::instructions::port::Port;
+
+/// A structure for holding information about the VGA text cursor.
+pub struct Cursor {
+    cur_port: Port<u8>,
+    cur_port_pos: Port<u8>,
+    cursor_size: u8, // at max 14, otherwise panic
+}
+
+impl Cursor {
+    fn new(cursor_size: u8) -> Cursor {
+        assert!(cursor_size < 15);
+
+        Cursor {
+            cur_port: Port::new(0x3D4),
+            cur_port_pos: Port::new(0x3D5),
+            cursor_size,
+        }
+    }
+
+    /// Enable or disable cursor.
+    fn set_state(&mut self, state: bool) {
+        if state {
+            unsafe { 
+                self.cur_port.write(0x0A);
+                let mut som = self.cur_port_pos.read() & 0xC0 | 1;
+                self.cur_port_pos.write(som);
+                self.cur_port_pos.write(0x0B);
+                som = self.cur_port_pos.read() & 0xE0 | 15 - self.cursor_size;
+                self.cur_port_pos.write(som);
+            }
+        } else {
+            unsafe { 
+                self.cur_port.write(0x0A);
+                self.cur_port_pos.write(0x20);
+            }
+        }
+    } 
+
+    /// Set cursor position, x equals to column position and y equals to row position.
+    fn set_position(&mut self, x: u16, y: u16) {
+        let pos: u16 = y * BUFFER_WIDTH as u16 + x;
+
+        unsafe {
+            self.cur_port.write(0x0F);
+            self.cur_port_pos.write((pos & 0xFF) as u8);
+            self.cur_port.write(0x0E);
+            self.cur_port_pos.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
+}
+
 /// A screen character in the VGA text buffer, consisting of an ASCII character and a `ColorCode`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
@@ -78,6 +135,7 @@ struct Buffer {
 pub struct Writer {
     column_position: usize,
     color_code: ColorCode,
+    cursor: Cursor,
     buffer: &'static mut Buffer,
 }
 
@@ -88,7 +146,7 @@ impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
-            8 => self.backspace(),
+            0x08 => self.backspace(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
@@ -117,10 +175,14 @@ impl Writer {
             match byte {
                 // printable ASCII byte or newline
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
+                // support for backspace
+                0x08 => self.write_byte(0x08),
                 // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
         }
+        // Update cursor position
+        self.cursor.set_position(self.column_position as u16, BUFFER_HEIGHT as u16 - 1);
     }
 
     /// Shifts all lines one line up and clears the last row.
@@ -135,14 +197,15 @@ impl Writer {
         self.column_position = 0;
     }
 
-    /// Shifts all lines one line down.
+    /// Shifts all lines one line down and clears the first row.
     fn del_line(&mut self) {
-        for row in (1..BUFFER_HEIGHT - 1).rev() {
+        for row in (0..BUFFER_HEIGHT - 1).rev() {
             for col in 0..BUFFER_WIDTH {
                 let character = self.buffer.chars[row][col].read();
                 self.buffer.chars[row + 1][col].write(character);
             }
         }
+        self.clear_row(0);
         self.column_position = BUFFER_WIDTH;
     }
 
@@ -203,21 +266,20 @@ pub fn _print(args: fmt::Arguments) {
     });
 }
 
-/// Prints given byte to the VGA text buffer through the global `WRITER` instance.
-pub fn print_byte(byte: u8) {
-    use x86_64::instructions::interrupts;
-
-    interrupts::without_interrupts(|| {
-        WRITER.lock().write_byte(byte);
-    })    
-}
-
 /// Changes the global `WRITER` instance `ColorCode` to the given colors.
 pub fn change_writer_color(foreground: Color, background: Color) {
     use x86_64::instructions::interrupts;
 
     interrupts::without_interrupts(|| {
         WRITER.lock().color_code = ColorCode::new(foreground, background);
+    });
+}
+
+pub fn clear_row(row: usize) {
+    use x86_64::instructions::interrupts;
+
+    interrupts::without_interrupts(|| {
+        WRITER.lock().clear_row(row);
     });
 }
 
