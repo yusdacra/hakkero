@@ -80,7 +80,7 @@ impl Cursor {
     /// Enable or disable cursor.
     fn set_state(&mut self, state: bool) {
         if state {
-            unsafe { 
+            unsafe {
                 self.cur_port.write(0x0A);
                 let mut som = self.cur_port_pos.read() & 0xC0 | 1;
                 self.cur_port_pos.write(som);
@@ -89,12 +89,12 @@ impl Cursor {
                 self.cur_port_pos.write(som);
             }
         } else {
-            unsafe { 
+            unsafe {
                 self.cur_port.write(0x0A);
                 self.cur_port_pos.write(0x20);
             }
         }
-    } 
+    }
 
     /// Set cursor position, x equals to column position and y equals to row position.
     fn set_position(&mut self, x: u16, y: u16) {
@@ -182,7 +182,8 @@ impl Writer {
             }
         }
         // Update cursor position
-        self.cursor.set_position(self.column_position as u16, BUFFER_HEIGHT as u16 - 1);
+        self.cursor
+            .set_position(self.column_position as u16, BUFFER_HEIGHT as u16 - 1);
     }
 
     /// Shifts all lines one line up and clears the last row.

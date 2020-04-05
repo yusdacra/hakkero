@@ -26,7 +26,6 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 /// Tests
-
 use alloc::boxed::Box;
 
 #[test_case]

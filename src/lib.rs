@@ -19,9 +19,9 @@ pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
+pub mod readline;
 pub mod serial;
 pub mod vga_buffer;
-pub mod readline;
 
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
