@@ -1,5 +1,5 @@
 use crate::alloc::borrow::ToOwned;
-use crate::{print, serial_println};
+use crate::print;
 use alloc::string::String;
 use lazy_static::lazy_static;
 use spin::Mutex;
@@ -29,7 +29,6 @@ impl Readline {
             self.retrieve = true;
         } else if self.pos > 0 && character == '\u{8}' {
             print!("{}", character);
-            serial_println!("pos: {}", self.pos);
             self.pos -= 1;
             self.buf.remove(self.pos);
         } else if character != '\u{8}' {

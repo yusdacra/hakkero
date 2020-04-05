@@ -9,12 +9,16 @@ use bootloader::{entry_point, BootInfo};
 extern crate alloc;
 
 use core::panic::PanicInfo;
-use hakkero::{print, println};
+use hakkero::{hlt_loop, println};
 
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use hakkero::vga_buffer::{self, Color};
+    use hakkero::vga_buffer;
+    use vga::colors::{Color16, TextModeColor};
+
+    let prompt_color = TextModeColor::new(Color16::LightGrey, Color16::Black);
+    let input_color = TextModeColor::new(Color16::White, Color16::Black);
 
     // Initialize things
     hakkero::init_heap(boot_info);
@@ -23,7 +27,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Run these without no interrupts
     x86_64::instructions::interrupts::without_interrupts(|| {
         // Welcome text
-        vga_buffer::change_writer_color(Color::LightRed, Color::Black);
+        vga_buffer::change_writer_color(TextModeColor::new(Color16::LightRed, Color16::Black));
         println!(
             "Welcome to, 
                                          __   __ 
@@ -35,20 +39,20 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 (*very* powerful furnace OS)\n"
         );
 
-        vga_buffer::change_writer_color(Color::LightBlue, Color::Black);
+        vga_buffer::change_writer_color(TextModeColor::new(Color16::LightBlue, Color16::Black));
         println!("*cough* Testing...");
         tutorial_test_things();
 
         #[cfg(test)]
         test_main();
 
-        vga_buffer::change_writer_color(Color::LightGreen, Color::Black);
+        vga_buffer::change_writer_color(TextModeColor::new(Color16::LightGreen, Color16::Black));
         println!("Didn't crash. Am I doing something right?");
     });
 
-    // Shell time bois
-    vga_buffer::change_writer_color(Color::LightGray, Color::Black);
-    print!("\n:> ");
+    // Shell time bois 
+    vga_buffer::change_writer_color(input_color);
+    vga_buffer::print_colored(prompt_color, "\n:> ");
 
     loop {
         x86_64::instructions::interrupts::without_interrupts(|| {
@@ -65,15 +69,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
                         x86_64::instructions::port::Port::<u8>::new(0x64).write(0xFE);
                     }
                 } else if data == "clear" {
-                    for row in 0..=24 {
-                        vga_buffer::clear_row(row);
-                    }
+                    vga_buffer::clear_screen();
                 } else if data == "Hello," {
                     println!("world!");
                 } else if !data.is_empty() {
                     println!("no such command: {}", data);
                 }
-                print!(":> ");
+                vga_buffer::print_colored(prompt_color, "\n:> ");
             }
         });
         x86_64::instructions::hlt();
