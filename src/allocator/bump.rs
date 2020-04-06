@@ -1,5 +1,5 @@
+use super::{align_up, Locked};
 use alloc::alloc::{GlobalAlloc, Layout};
-use super::{Locked, align_up};
 use core::ptr;
 
 pub struct BumpAllocator {
@@ -31,8 +31,7 @@ impl BumpAllocator {
     }
 }
 
-// TODO: Implement downwards instead of upward
-// // TODO: Implement downwards instead of upwardss
+// TODO: Implement downwards instead of upwards
 unsafe impl GlobalAlloc for Locked<BumpAllocator> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let mut bump = self.lock();
@@ -40,11 +39,11 @@ unsafe impl GlobalAlloc for Locked<BumpAllocator> {
         let alloc_start = align_up(bump.next, layout.align());
         let alloc_end = match alloc_start.checked_add(layout.size()) {
             Some(end) => end,
-            None => return ptr::null_mut(), // out of memory condition
+            None => return ptr::null_mut(), // Out of memory condition
         };
 
         if alloc_end > bump.heap_end {
-            ptr::null_mut() // out of memory condition
+            ptr::null_mut() // Out of memory condition
         } else {
             bump.next = alloc_end;
             bump.allocations += 1;

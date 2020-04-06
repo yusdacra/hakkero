@@ -5,13 +5,14 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 
 lazy_static! {
+    /// The global `Readline`. Used by the kernel shell.
     pub static ref RL: Mutex<Readline> = Mutex::new(Readline::new());
 }
 
+/// Handles characters and stores them inside a buffer.
 pub struct Readline {
     pos: usize,
     buf: String,
-    retrieve: bool,
 }
 
 impl Readline {
@@ -19,14 +20,13 @@ impl Readline {
         Readline {
             pos: 0,
             buf: String::new(),
-            retrieve: false,
         }
     }
 
     pub fn handle_character(&mut self, character: char) {
         if character == '\n' {
-            print!("{}", character);
-            self.retrieve = true;
+            // Readline doesn't handle newlines. Name checks out.
+            return;
         } else if self.pos > 0 && character == '\u{8}' {
             print!("{}", character);
             self.pos -= 1;
@@ -39,17 +39,25 @@ impl Readline {
     }
 
     pub fn retrieve_data(&mut self) -> Option<String> {
-        if self.retrieve {
-            return Some({
-                self.retrieve = false;
-                self.pos = 0;
-                let mut res = String::with_capacity(self.buf.capacity());
+        if self.buf.is_empty() {
+            None
+        } else {
+            Some({
+                let mut res = String::default();
                 self.buf.clone_into(&mut res);
                 self.buf.clear();
                 res
-            });
+            })
         }
-
-        None
     }
+}
+
+/// Handles a character by passing it to the global `Readline`.
+pub fn handle_character(char: char) {
+    RL.lock().handle_character(char);
+}
+
+/// Retrieves the data currently stored in the global `Readline`.
+pub fn retrieve_data() -> Option<String> {
+    RL.lock().retrieve_data()
 }

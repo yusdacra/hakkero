@@ -6,6 +6,7 @@
 #![feature(alloc_error_handler)]
 #![feature(const_fn)]
 #![feature(const_in_array_repeat_expressions)]
+#![feature(wake_trait)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
@@ -22,6 +23,7 @@ pub mod interrupts;
 pub mod memory;
 pub mod readline;
 pub mod serial;
+pub mod task;
 pub mod vga_buffer;
 
 #[alloc_error_handler]

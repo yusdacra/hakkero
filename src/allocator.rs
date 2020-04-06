@@ -1,12 +1,12 @@
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
+use fixed_size_block::FixedSizeBlockAllocator;
 use x86_64::{
     structures::paging::{
         mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
     },
     VirtAddr,
 };
-use fixed_size_block::FixedSizeBlockAllocator;
 
 pub mod bump;
 pub mod fixed_size_block;
@@ -15,8 +15,7 @@ pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 1000 * 1024; // 1000 KiB
 
 #[global_allocator]
-static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(
-    FixedSizeBlockAllocator::new());
+static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
 
 /// This is where the heap is actually initialized.
 /// Calculates the page range, allocates the frames, and then maps the pages to the allocated frames. Lastly, calls the static `ALLOCATOR`'s `init` function.

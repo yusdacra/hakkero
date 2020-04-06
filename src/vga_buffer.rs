@@ -3,10 +3,13 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 
 use vga::colors::{Color16, TextModeColor};
-use vga::writers::{ScreenCharacter, TextWriter, Text80x25};
+use vga::writers::{ScreenCharacter, Text80x25, TextWriter};
 
 #[cfg(test)]
 use crate::{serial_print, serial_println};
+
+pub type Color = Color16;
+pub type WriterColor = TextModeColor;
 
 lazy_static! {
     /// A global `Writer` instance that can be used for printing to the VGA text buffer.
@@ -14,15 +17,15 @@ lazy_static! {
     /// Used by the `print!` and `println!` macros.
     pub static ref WRITER: Mutex<Writer<Text80x25>> = Mutex::new(Writer {
         x_pos: 0,
-        color: TextModeColor::new(Color16::White, Color16::Black),
+        color: WriterColor::new(Color::White, Color::Black),
         size: BufferSize::new(80, 25),
         iw: Text80x25::new(),
     });
 }
 
-/// Alias which represents buffer size.
+/// Represents buffer size.
 ///
-/// Buffer size is *independent* from actual graphics settings. Should not be
+/// Buffer size is *independent* from actual graphics settings. It should not be
 /// bigger than actual graphics size.
 pub struct BufferSize {
     x: usize,
@@ -31,10 +34,7 @@ pub struct BufferSize {
 
 impl BufferSize {
     pub fn new(x: usize, y: usize) -> Self {
-        BufferSize {
-            x,
-            y,
-        }
+        BufferSize { x, y }
     }
 }
 
@@ -44,7 +44,7 @@ impl BufferSize {
 /// `core::fmt::Write` trait.
 pub struct Writer<T: TextWriter> {
     x_pos: usize,
-    color: TextModeColor, 
+    color: WriterColor,
     size: BufferSize,
     iw: T,
 }
@@ -56,7 +56,7 @@ impl<T: TextWriter> Writer<T> {
         self.iw.set_mode();
     }
 
-    /// Changes buffer size. 
+    /// Changes buffer size.
     pub fn set_size(&mut self, size: BufferSize) {
         self.size = size;
     }
@@ -74,7 +74,8 @@ impl<T: TextWriter> Writer<T> {
                 }
 
                 let screen_char = ScreenCharacter::new(byte, self.color);
-                self.iw.write_character(self.x_pos, self.size.y - 1, screen_char);
+                self.iw
+                    .write_character(self.x_pos, self.size.y - 1, screen_char);
 
                 self.x_pos += 1;
             }
@@ -98,8 +99,7 @@ impl<T: TextWriter> Writer<T> {
             }
         }
         // Update cursor position
-        self.iw
-            .set_cursor_position(self.x_pos, self.size.y - 1);
+        self.iw.set_cursor_position(self.x_pos, self.size.y - 1);
     }
 
     /// Shifts all lines one line up and clears the last line.
@@ -172,13 +172,13 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
-pub fn print_colored(color: TextModeColor, text: &str) { 
+pub fn print_colored(color: WriterColor, text: &str) {
     let mut writer = WRITER.lock();
     let old_color = writer.color;
     writer.color = color;
     x86_64::instructions::interrupts::without_interrupts(|| {
         writer.write_string(text);
-    }); 
+    });
     writer.color = old_color;
 }
 
@@ -194,9 +194,9 @@ pub fn _print(args: fmt::Arguments) {
     });
 }
 
-/// Changes the global `WRITER` instance `TextModeColor` to the given `TextModeColor`.
-pub fn change_writer_color(color: TextModeColor) {
-    WRITER.lock().color = color; 
+/// Changes the global `WRITER` instance `WriterColor` to the given `WriterColor`.
+pub fn change_writer_color(color: WriterColor) {
+    WRITER.lock().color = color;
 }
 
 /// Clears the screen using the global `WRITER` instance.
@@ -236,7 +236,7 @@ fn test_println_output() {
         let mut writer = WRITER.lock();
         writeln!(writer, "\n{}", s).expect("writeln failed");
         for (i, c) in s.chars().enumerate() {
-            let screen_char = writer.iw.read_character(i, writer.size.y - 2); 
+            let screen_char = writer.iw.read_character(i, writer.size.y - 2);
             assert_eq!(char::from(screen_char.get_character()), c);
         }
     });

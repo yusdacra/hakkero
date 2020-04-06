@@ -9,25 +9,22 @@ use bootloader::{entry_point, BootInfo};
 extern crate alloc;
 
 use core::panic::PanicInfo;
-use hakkero::{hlt_loop, println};
+use hakkero::task::{executor::Executor, keyboard, Task};
+use hakkero::{print, println};
 
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use hakkero::vga_buffer;
-    use vga::colors::{Color16, TextModeColor};
+    use hakkero::vga_buffer::{change_writer_color as cwc, Color, WriterColor};
 
-    let prompt_color = TextModeColor::new(Color16::LightGrey, Color16::Black);
-    let input_color = TextModeColor::new(Color16::White, Color16::Black);
-
-    // Initialize things
+    // Initialize phase
     hakkero::init_heap(boot_info);
     hakkero::init();
 
-    // Run these without no interrupts
+    // Show welcome text and run tests
     x86_64::instructions::interrupts::without_interrupts(|| {
         // Welcome text
-        vga_buffer::change_writer_color(TextModeColor::new(Color16::LightRed, Color16::Black));
+        cwc(WriterColor::new(Color::LightRed, Color::Black));
         println!(
             "Welcome to, 
                                          __   __ 
@@ -39,47 +36,22 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 (*very* powerful furnace OS)\n"
         );
 
-        vga_buffer::change_writer_color(TextModeColor::new(Color16::LightBlue, Color16::Black));
+        cwc(WriterColor::new(Color::LightBlue, Color::Black));
         println!("*cough* Testing...");
         tutorial_test_things();
 
         #[cfg(test)]
         test_main();
 
-        vga_buffer::change_writer_color(TextModeColor::new(Color16::LightGreen, Color16::Black));
-        println!("Didn't crash. Am I doing something right?");
+        cwc(WriterColor::new(Color::LightGreen, Color::Black));
+        print!("Didn't crash. Am I doing something right?");
+        cwc(WriterColor::new(Color::White, Color::Black));
+        println!();
     });
 
-    // Shell time bois
-    vga_buffer::change_writer_color(input_color);
-    vga_buffer::print_colored(prompt_color, "\n:> ");
-
-    loop {
-        x86_64::instructions::interrupts::without_interrupts(|| {
-            if let Some(data) = hakkero::readline::RL.lock().retrieve_data() {
-                let data = data.trim();
-                // Shutdown for QEMU
-                if data == "shutdown" {
-                    // Replace with the actual shutdown assembly / code
-                    unsafe {
-                        x86_64::instructions::port::Port::<u16>::new(0x604).write(0x2000);
-                    }
-                } else if data == "reboot" {
-                    unsafe {
-                        x86_64::instructions::port::Port::<u8>::new(0x64).write(0xFE);
-                    }
-                } else if data == "clear" {
-                    vga_buffer::clear_screen();
-                } else if data == "Hello," {
-                    println!("world!");
-                } else if !data.is_empty() {
-                    println!("no such command: {}", data);
-                }
-                vga_buffer::print_colored(prompt_color, "\n:> ");
-            }
-        });
-        x86_64::instructions::hlt();
-    }
+    let mut executor = Executor::new();
+    executor.spawn(Task::new(keyboard::handle_scancodes()));
+    executor.run();
 }
 
 fn tutorial_test_things() {
@@ -116,7 +88,7 @@ fn tutorial_test_things() {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
-    hlt_loop()
+    hakkero::hlt_loop()
 }
 
 #[cfg(test)]
