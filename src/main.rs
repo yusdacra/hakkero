@@ -50,7 +50,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         println!("Didn't crash. Am I doing something right?");
     });
 
-    // Shell time bois 
+    // Shell time bois
     vga_buffer::change_writer_color(input_color);
     vga_buffer::print_colored(prompt_color, "\n:> ");
 
