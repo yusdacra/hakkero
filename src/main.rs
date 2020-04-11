@@ -9,17 +9,26 @@ use bootloader::{entry_point, BootInfo};
 extern crate alloc;
 
 use core::panic::PanicInfo;
-use hakkero::task::{executor::Executor, keyboard, Task};
+use hakkero::task::{
+    executor::{Executor, Spawner},
+    keyboard, Task,
+};
 use hakkero::{print, println};
 
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use hakkero::vga_buffer::{change_writer_color as cwc, Color, WriterColor};
-
     // Initialize phase
     hakkero::init_heap(boot_info);
     hakkero::init();
+
+    let mut executor = Executor::new();
+    executor.spawn(Task::new(start(executor.spawner())));
+    executor.run();
+}
+
+async fn start(spawner: Spawner) {
+    use hakkero::vga_buffer::{change_writer_color as cwc, Color, WriterColor};
 
     // Show welcome text and run tests
     x86_64::instructions::interrupts::without_interrupts(|| {
@@ -49,9 +58,11 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         println!();
     });
 
-    let mut executor = Executor::new();
-    executor.spawn(Task::new(keyboard::handle_scancodes()));
-    executor.run();
+    spawner.spawn(Task::new(start_handlers(spawner.clone())));
+}
+
+async fn start_handlers(spawner: Spawner) {
+    spawner.spawn(Task::new(keyboard::handle_scancodes()));
 }
 
 fn tutorial_test_things() {

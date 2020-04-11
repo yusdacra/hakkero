@@ -30,8 +30,20 @@ impl Wake for TaskWaker {
     }
 }
 
+#[derive(Clone)]
+pub struct Spawner {
+    spawned_tasks: Arc<ArrayQueue<Task>>,
+}
+
+impl Spawner {
+    pub fn spawn(&self, task: Task) {
+        self.spawned_tasks.push(task).expect("why")
+    }
+}
+
 pub struct Executor {
     task_queue: VecDeque<Task>,
+    spawned_tasks: Arc<ArrayQueue<Task>>,
     waiting_tasks: BTreeMap<TaskId, Task>,
     wake_queue: Arc<ArrayQueue<TaskId>>,
     waker_cache: BTreeMap<TaskId, Waker>,
@@ -41,6 +53,7 @@ impl Executor {
     pub fn new() -> Self {
         Executor {
             task_queue: VecDeque::new(),
+            spawned_tasks: Arc::new(ArrayQueue::new(100)),
             waiting_tasks: BTreeMap::new(),
             wake_queue: Arc::new(ArrayQueue::new(100)),
             waker_cache: BTreeMap::new(),
@@ -49,6 +62,12 @@ impl Executor {
 
     pub fn spawn(&mut self, task: Task) {
         self.task_queue.push_back(task)
+    }
+
+    pub fn spawner(&self) -> Spawner {
+        Spawner {
+            spawned_tasks: self.spawned_tasks.clone(),
+        }
     }
 
     pub fn run(&mut self) -> ! {
@@ -84,6 +103,9 @@ impl Executor {
     }
 
     fn run_ready_tasks(&mut self) {
+        while let Ok(task) = self.spawned_tasks.pop() {
+            self.task_queue.push_back(task);
+        }
         while let Some(mut task) = self.task_queue.pop_front() {
             let task_id = task.id;
             // Create a new `Waker` if it isn't already in the cache.
