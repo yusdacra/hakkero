@@ -1,4 +1,3 @@
-use crate::alloc::borrow::ToOwned;
 use crate::print;
 use alloc::string::String;
 use lazy_static::lazy_static;
@@ -43,8 +42,7 @@ impl Readline {
             None
         } else {
             Some({
-                let mut res = String::default();
-                self.buf.clone_into(&mut res);
+                let res = self.buf.clone();
                 self.buf.clear();
                 res
             })

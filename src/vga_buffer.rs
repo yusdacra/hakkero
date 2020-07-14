@@ -172,6 +172,7 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
+/// Prints the text colored in given `WriterColor`. Changes the colors to old colors when printing finishes.
 pub fn print_colored(color: WriterColor, text: &str) {
     let mut writer = WRITER.lock();
     let old_color = writer.color;
