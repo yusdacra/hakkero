@@ -85,9 +85,7 @@ pub fn hlt_loop() -> ! {
     }
 }
 
-pub fn woint<F: FnOnce() -> R, R>(f: F) -> R {
-    x86_64::instructions::interrupts::without_interrupts(f)
-}
+pub use x86_64::instructions::interrupts::without_interrupts as woint;
 
 #[cfg(test)]
 entry_point!(test_kernel_main);

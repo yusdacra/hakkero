@@ -31,7 +31,7 @@ async fn start(spawner: Spawner) {
     use hakkero::vga_buffer::{change_writer_color as cwc, Color, WriterColor};
 
     // Show welcome text and run tests
-    x86_64::instructions::interrupts::without_interrupts(|| {
+    hakkero::woint(|| {
         // Welcome text
         cwc(WriterColor::new(Color::LightRed, Color::Black));
         println!(

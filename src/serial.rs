@@ -13,9 +13,8 @@ lazy_static! {
 #[doc(hidden)]
 pub fn _print(args: ::core::fmt::Arguments) {
     use core::fmt::Write;
-    use x86_64::instructions::interrupts;
 
-    interrupts::without_interrupts(|| {
+    crate::woint(|| {
         SERIAL1
             .lock()
             .write_fmt(args)
