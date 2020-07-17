@@ -17,7 +17,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bootloader"
-version = "0.9.5"
+version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -92,7 +92,7 @@ dependencies = [
 name = "hakkero"
 version = "0.1.0"
 dependencies = [
- "bootloader 0.9.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bootloader 0.9.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam-queue 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-util 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -268,7 +268,7 @@ dependencies = [
 "checksum autocfg 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 "checksum bit_field 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 "checksum bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
-"checksum bootloader 0.9.5 (registry+https://github.com/rust-lang/crates.io-index)" = "bb7239572eacd7c74ac0d6c75eb87a615058d6497a667728694e0d32b7bd5a20"
+"checksum bootloader 0.9.8 (registry+https://github.com/rust-lang/crates.io-index)" = "0ad686b9b47363de7d36c05fb6885f17d08d0f2d15b1bc782a101fe3c94a2c7c"
 "checksum cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 "checksum conquer-once 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "96eb12fb69466716fbae9009d389e6a30830ae8975e170eff2d2cff579f9efa3"
 "checksum conquer-util 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "654fb2472cc369d311c547103a1fa81d467bef370ae7a0680f65939895b1182a"
