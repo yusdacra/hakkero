@@ -176,7 +176,7 @@ impl<T: TextWriter> fmt::Write for VgaWriter<T> {
 /// Like the `print!` macro in the standard library, but prints to the VGA text buffer.
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => ($crate::vga::text::_print(format_args!($($arg)*)));
 }
 
 /// Like the `println!` macro in the standard library, but prints to the VGA text buffer.
@@ -189,7 +189,7 @@ macro_rules! println {
 /// Prints text to VGA buffer colored with given color.
 #[macro_export]
 macro_rules! print_colored {
-    ($color:expr, $($arg:tt)*) => ($crate::vga_buffer::_print_colored(format_args!($($arg)*), $color));
+    ($color:expr, $($arg:tt)*) => ($crate::vga::text::_print_colored(format_args!($($arg)*), $color));
 }
 
 /// Prints text to VGA buffer colored with given color, but with a new line at the end.

@@ -23,7 +23,7 @@ pub mod interrupts;
 pub mod memory;
 pub mod serial;
 pub mod task;
-pub mod vga_buffer;
+pub mod vga;
 
 #[alloc_error_handler]
 fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {

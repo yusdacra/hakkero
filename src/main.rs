@@ -28,7 +28,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 }
 
 async fn start(spawner: Spawner) {
-    use hakkero::vga_buffer::{change_writer_color as cwc, Color, WriterColor};
+    use hakkero::vga::text::{change_writer_color as cwc, Color, WriterColor};
     cwc(WriterColor::new(Color::White, Color::Black));
 
     // Show welcome text and run tests
