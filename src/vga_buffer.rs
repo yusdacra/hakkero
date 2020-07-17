@@ -186,17 +186,33 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
+/// Prints text to VGA buffer colored with given color.
+#[macro_export]
+macro_rules! print_colored {
+    ($color:expr, $($arg:tt)*) => ($crate::vga_buffer::_print_colored(format_args!($($arg)*), $color));
+}
+
+/// Prints text to VGA buffer colored with given color, but with a new line at the end.
+#[macro_export]
+macro_rules! println_colored {
+    ($color:expr) => ($crate::print_colored!($color, "\n"));
+    ($color:expr, $($arg:tt)*) => ($crate::print_colored!($color, "{}\n", format_args!($($arg)*)));
+}
+
+#[doc(hidden)]
 /// Prints the text colored in given `WriterColor`. Changes the colors to old colors when printing finishes.
-pub fn print_colored(color: WriterColor, text: &str) {
+pub fn _print_colored(args: fmt::Arguments, color: WriterColor) {
+    use core::fmt::Write;
+
     let mut writer = WRITER.lock();
     let old_color = writer.color;
     writer.color = color;
-    woint(|| writer.write_string(text));
+    woint(|| writer.write_fmt(args).unwrap());
     writer.color = old_color;
 }
 
-/// Prints the given formatted string to the VGA text buffer through the global `WRITER` instance.
 #[doc(hidden)]
+/// Prints the given formatted string to the VGA text buffer through the global `WRITER` instance.
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
 

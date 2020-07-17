@@ -1,4 +1,4 @@
-use crate::{println, print};
+use crate::{print, println};
 use core::{
     pin::Pin,
     task::{Context, Poll},
@@ -6,7 +6,7 @@ use core::{
 use crossbeam_queue::ArrayQueue;
 use futures_util::stream::{Stream, StreamExt};
 use futures_util::task::AtomicWaker;
-use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1, DecodedKey};
+use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Once;
 
 const SC_CAP: usize = 100;
@@ -41,7 +41,9 @@ pub async fn handle_scancodes() {
 pub(crate) fn add_scancode(scancode: u8) {
     if let Some(queue) = SCANCODE_QUEUE.r#try() {
         if let Err(_) = queue.push(scancode) {
-            println!("WARNING: scancode queue full, clearing queue to avoid dropping keyboard input");
+            println!(
+                "WARNING: scancode queue full, clearing queue to avoid dropping keyboard input"
+            );
             clear_array_queue(&queue);
         } else {
             WAKER.wake();
@@ -58,8 +60,7 @@ pub struct ScancodeStream {
 
 impl ScancodeStream {
     pub fn new() -> Self {
-        SCANCODE_QUEUE
-            .call_once(|| ArrayQueue::new(SC_CAP));
+        SCANCODE_QUEUE.call_once(|| ArrayQueue::new(SC_CAP));
         ScancodeStream { _private: () }
     }
 }

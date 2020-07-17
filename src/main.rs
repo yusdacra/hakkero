@@ -13,7 +13,7 @@ use hakkero::task::{
     executor::{Executor, Spawner},
     keyboard, Task,
 };
-use hakkero::{print, println};
+use hakkero::{println, println_colored};
 
 entry_point!(kernel_main);
 
@@ -29,12 +29,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
 async fn start(spawner: Spawner) {
     use hakkero::vga_buffer::{change_writer_color as cwc, Color, WriterColor};
+    cwc(WriterColor::new(Color::White, Color::Black));
 
     // Show welcome text and run tests
     hakkero::woint(|| {
         // Welcome text
-        cwc(WriterColor::new(Color::LightRed, Color::Black));
-        println!(
+        println_colored!(
+            WriterColor::new(Color::LightRed, Color::Black),
             "Welcome to, 
                                          __   __ 
      /  |      /    /                   /  | /   
@@ -42,20 +43,22 @@ async fn start(spawner: Spawner) {
     |   )|   )|___)|___)|___)|   )|   )|   )    )
     |  / |__/|| \\  | \\  |__  |    |__/ |__/  __/
 
-(*very* powerful furnace OS)\n"
+(*very* powerful furnace OS)\n",
         );
 
-        cwc(WriterColor::new(Color::LightBlue, Color::Black));
-        println!("*cough* Testing...");
+        println_colored!(
+            WriterColor::new(Color::LightBlue, Color::Black),
+            "*cough* Testing..."
+        );
         tutorial_test_things();
 
         #[cfg(test)]
         test_main();
 
-        cwc(WriterColor::new(Color::LightGreen, Color::Black));
-        print!("Didn't crash. Am I doing something right?");
-        cwc(WriterColor::new(Color::White, Color::Black));
-        println!();
+        println_colored!(
+            WriterColor::new(Color::LightGreen, Color::Black),
+            "Didn't crash. Am I doing something right?"
+        );
     });
 
     spawner.spawn(Task::new(start_handlers(spawner.clone())));
