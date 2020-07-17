@@ -11,92 +11,33 @@ use crate::{serial_print, serial_println};
 
 pub type Color = Color16;
 pub type WriterColor = TextModeColor;
+type DefWriter = Text80x25;
 
 lazy_static! {
     /// A global `Writer` instance that can be used for printing to the VGA text buffer.
     ///
     /// Used by the `print!` and `println!` macros.
-    pub static ref WRITER: Mutex<VgaWriter<Text80x25>> = Mutex::new(VgaWriter {
-        color: WriterColor::new(Color::White, Color::Black),
-        geo: BufferGeometry::new(80, 25),
-        iw: Text80x25::new(),
-    });
-}
-
-/// Stores buffer size and current cursor position information.
-pub struct BufferGeometry {
-    x_size: usize,
-    y_size: usize,
-    x_pos: usize,
-    y_pos: usize,
-}
-
-impl BufferGeometry {
-    pub fn new(x_size: usize, y_size: usize) -> Self {
-        Self {
-            x_size,
-            y_size,
-            x_pos: 0,
-            y_pos: 0,
-        }
-    }
-
-    /// Set position (`x_pos` for x axis and `y_pos` for y axis).
-    /// Clamps to `x_size` for `x` and `y_size` for `y`.
-    pub fn set_pos(&mut self, x: usize, y: usize) {
-        self.x_pos = if x > self.x_size { self.x_size } else { x };
-        self.y_pos = if y > self.y_size { self.y_size } else { y };
-    }
-
-    /// Set x axis position.
-    pub fn set_x(&mut self, to: usize) {
-        self.set_pos(to, self.y_pos)
-    }
-
-    /// Set y axis position.
-    pub fn set_y(&mut self, to: usize) {
-        self.set_pos(self.x_pos, to)
-    }
-
-    /// Offset the position by `x` for `x_pos` and `y` for `y_pos`.
-    pub fn offset_pos(&mut self, x: isize, y: isize) {
-        self.set_pos(
-            (self.x_pos as isize + x) as usize,
-            (self.y_pos as isize + y) as usize,
-        )
-    }
-
-    /// Offset x axis.
-    pub fn offset_x(&mut self, by: isize) {
-        self.offset_pos(by, 0)
-    }
-
-    /// Offset y axis.
-    pub fn offset_y(&mut self, by: isize) {
-        self.offset_pos(0, by)
-    }
+    pub static ref WRITER: Mutex<VgaWriter<DefWriter>> = Mutex::new(VgaWriter::new(DefWriter::new()));
 }
 
 /// A writer type that allows writing ASCII bytes and strings using.
 ///
 /// Wraps lines at `size.x`. Supports newline characters and implements the
 /// `core::fmt::Write` trait.
-pub struct VgaWriter<T: TextWriter> {
+pub struct VgaWriter<T: TextWriter + Send + Sync> {
     color: WriterColor,
-    geo: BufferGeometry,
+    x_pos: usize,
     iw: T,
 }
 
-impl<T: TextWriter> VgaWriter<T> {
-    /// Changes internal `TextWriter` and updates graphics mode.
-    pub fn set_writer(&mut self, writer: T) {
-        self.iw = writer;
-        self.iw.set_mode();
-    }
-
-    /// Mutable access to inner `BufferGeometry`.
-    pub fn get_mut_geo(&mut self) -> &mut BufferGeometry {
-        &mut self.geo
+impl<T: TextWriter + Send + Sync> VgaWriter<T> {
+    /// Create a new `VgaWriter` from the given `TextWriter`.
+    pub fn new(iw: T) -> Self {
+        Self {
+            color: WriterColor::new(Color::White, Color::Black),
+            x_pos: 0,
+            iw,
+        }
     }
 
     /// Access to inner `TextWriter`.
@@ -105,10 +46,12 @@ impl<T: TextWriter> VgaWriter<T> {
     }
 
     /// Writes an ASCII byte to the buffer at current position.
-    pub fn write_byte(&mut self, byte: u8) {
-        let screen_char = ScreenCharacter::new(byte, self.color);
-        self.iw
-            .write_character(self.geo.x_pos, self.geo.y_pos, screen_char);
+    fn write_byte(&self, byte: u8) {
+        self.iw.write_character(
+            self.x_pos,
+            T::HEIGHT - 1,
+            ScreenCharacter::new(byte, self.color),
+        );
     }
 
     /// Writes the given ASCII string to the buffer.
@@ -118,7 +61,7 @@ impl<T: TextWriter> VgaWriter<T> {
     /// mode.
     fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
-            if self.geo.x_pos >= self.geo.x_size {
+            if self.x_pos >= T::WIDTH {
                 self.new_line();
             }
             match byte {
@@ -132,41 +75,44 @@ impl<T: TextWriter> VgaWriter<T> {
                 // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
-            self.geo.offset_x(1);
+            self.x_pos += 1;
         }
         // Update cursor position
-        self.iw.set_cursor_position(self.geo.x_pos, self.geo.y_pos);
+        self.iw.set_cursor_position(self.x_pos, T::HEIGHT - 1);
     }
 
-    /// Shifts all lines one line up and clears the last line.
+    /// Clears a line by overwriting it with a blank character.
+    fn clear_line(&self, y: usize) {
+        for x in 0..T::WIDTH {
+            self.iw.write_character(x, y, self.blank_char());
+        }
+    }
+
+    /// Clears the last line and shifts all lines one line upwards.
     fn new_line(&mut self) {
-        for y in 1..self.geo.y_size {
-            for x in 0..self.geo.x_size {
+        for y in 1..T::HEIGHT {
+            for x in 0..T::WIDTH {
                 let character = self.iw.read_character(x, y);
                 self.iw.write_character(x, y - 1, character);
             }
         }
-        self.clear_line(self.geo.y_size - 1);
-        self.geo.set_pos(0, self.geo.y_size - 1);
+        self.clear_line(T::HEIGHT - 1);
+        self.x_pos = 0;
     }
 
-    /// Clears a line by overwriting it with a blank character.
-    fn clear_line(&mut self, y: usize) {
-        let blank = ScreenCharacter::new(b' ', self.color);
-        for x in 0..self.geo.x_size {
-            self.iw.write_character(x, y, blank);
-        }
-    }
-
+    #[allow(dead_code)]
     /// Clears the screen by filling it with a blank character.
-    fn clear_screen(&mut self) {
-        for y in 0..self.geo.y_size {
-            self.clear_line(y);
-        }
+    fn clear_screen(&self) {
+        self.iw.fill_screen(self.blank_char());
+    }
+
+    /// Returns a blank character ' ' with current color.
+    fn blank_char(&self) -> ScreenCharacter {
+        ScreenCharacter::new(b' ', self.color)
     }
 }
 
-impl<T: TextWriter> fmt::Write for VgaWriter<T> {
+impl<T: TextWriter + Send + Sync> fmt::Write for VgaWriter<T> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_string(s);
         Ok(())
@@ -204,11 +150,13 @@ macro_rules! println_colored {
 pub fn _print_colored(args: fmt::Arguments, color: WriterColor) {
     use core::fmt::Write;
 
-    let mut writer = WRITER.lock();
-    let old_color = writer.color;
-    writer.color = color;
-    woint(|| writer.write_fmt(args).unwrap());
-    writer.color = old_color;
+    woint(|| {
+        let mut writer = WRITER.lock();
+        let old_color = writer.color;
+        writer.color = color;
+        write!(writer, "{}", args).unwrap();
+        writer.color = old_color;
+    });
 }
 
 #[doc(hidden)]
@@ -216,17 +164,14 @@ pub fn _print_colored(args: fmt::Arguments, color: WriterColor) {
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
 
-    woint(|| WRITER.lock().write_fmt(args).unwrap());
+    woint(|| write!(WRITER.lock(), "{}", args).unwrap());
 }
 
 /// Changes the global `WRITER` instance `WriterColor` to the given `WriterColor`.
 pub fn change_writer_color(color: WriterColor) {
-    WRITER.lock().color = color;
-}
-
-/// Clears the screen using the global `WRITER` instance.
-pub fn clear_screen() {
-    woint(|| WRITER.lock().clear_screen());
+    woint(|| {
+        WRITER.lock().color = color;
+    })
 }
 
 #[test_case]
@@ -248,6 +193,7 @@ fn test_println_many() {
 #[test_case]
 fn test_println_output() {
     use core::fmt::Write;
+    use vga::writers::Screen;
 
     serial_print!("test_println_output... ");
 
@@ -256,7 +202,7 @@ fn test_println_output() {
         let mut writer = WRITER.lock();
         writeln!(writer, "\n{}", s).expect("writeln failed");
         for (i, c) in s.chars().enumerate() {
-            let screen_char = writer.iw.read_character(i, writer.geo.y_size - 2);
+            let screen_char = writer.iw.read_character(i, DefWriter::HEIGHT - 2);
             assert_eq!(char::from(screen_char.get_character()), c);
         }
     });
