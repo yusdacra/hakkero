@@ -13,10 +13,9 @@
 
 extern crate alloc;
 
-use core::panic::PanicInfo;
-
 #[cfg(test)]
 use bootloader::{entry_point, BootInfo};
+use core::panic::PanicInfo;
 
 pub mod allocator;
 pub mod gdt;

@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use log::{Log, Metadata, Record};
 use spin::Mutex;
 use uart_16550::SerialPort;
 
@@ -37,4 +38,20 @@ macro_rules! serial_println {
     ($fmt:expr) => ($crate::serial_print!(concat!($fmt, "\n")));
     ($fmt:expr, $($arg:tt)*) => ($crate::serial_print!(
         concat!($fmt, "\n"), $($arg)*));
+}
+
+pub struct SerialLogger;
+
+impl Log for SerialLogger {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            crate::serial_println!("[{:5}] {}", record.level(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
 }

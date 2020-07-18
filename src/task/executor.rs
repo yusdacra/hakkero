@@ -31,28 +31,31 @@ impl Wake for TaskWaker {
     }
 }
 
-static SPAWNED_TASKS: Once<Arc<ArrayQueue<Task>>> = Once::new();
+/// Clone of `waiting_for_task_queue` in the Executor.
+static WFTQ: Once<Arc<ArrayQueue<Task>>> = Once::new();
 
 /// Queues the task to be run in the next poll.
 /// Will fail if the queue is full, or the executor has not been initialized.
 pub fn spawn_task(task: Task) {
-    match SPAWNED_TASKS.r#try() {
+    use log::warn;
+
+    match WFTQ.r#try() {
         Some(s) => {
             if s.push(task).is_err() {
-                crate::println!("can't spawn task, queue full!");
+                warn!("can't spawn task, queue full!");
             }
         }
-        None => crate::println!("executor not initialized, can't spawn task"),
+        None => warn!("executor not initialized, can't spawn task"),
     }
 }
 
-/// How many tasks can be queued at the same time.
-pub const TASK_LIMIT: usize = 100;
+/// How many tasks / wakers can be queued at the same time.
+pub const TASK_QUEUE_LIMIT: usize = 100;
 
 /// Simple FIFO task executor. Supports wakers.
 pub struct Executor {
     task_queue: VecDeque<Task>,
-    spawned_tasks: Arc<ArrayQueue<Task>>,
+    waiting_for_task_queue: Arc<ArrayQueue<Task>>,
     waiting_tasks: BTreeMap<TaskId, Task>,
     wake_queue: Arc<ArrayQueue<TaskId>>,
     waker_cache: BTreeMap<TaskId, Waker>,
@@ -60,13 +63,13 @@ pub struct Executor {
 
 impl Executor {
     pub fn new() -> Self {
-        let spawned_tasks = Arc::new(ArrayQueue::new(TASK_LIMIT));
-        SPAWNED_TASKS.call_once(|| spawned_tasks.clone());
+        let waiting_for_task_queue = Arc::new(ArrayQueue::new(TASK_QUEUE_LIMIT));
+        WFTQ.call_once(|| waiting_for_task_queue.clone());
         Executor {
             task_queue: VecDeque::new(),
-            spawned_tasks,
+            waiting_for_task_queue,
             waiting_tasks: BTreeMap::new(),
-            wake_queue: Arc::new(ArrayQueue::new(TASK_LIMIT)),
+            wake_queue: Arc::new(ArrayQueue::new(TASK_QUEUE_LIMIT)),
             waker_cache: BTreeMap::new(),
         }
     }
@@ -108,7 +111,7 @@ impl Executor {
     }
 
     fn run_ready_tasks(&mut self) {
-        while let Ok(task) = self.spawned_tasks.pop() {
+        while let Ok(task) = self.waiting_for_task_queue.pop() {
             self.task_queue.push_back(task);
         }
         while let Some(mut task) = self.task_queue.pop_front() {
@@ -129,8 +132,9 @@ impl Executor {
                     self.waker_cache.remove(&task_id);
                 }
                 Poll::Pending => {
+                    // Task isn't done, back to waiting list
                     if self.waiting_tasks.insert(task_id, task).is_some() {
-                        panic!("Task with same ID already in waiting_tasks!");
+                        panic!("Task with same ID already in waiting_tasks! Literally how");
                     }
                 }
             }

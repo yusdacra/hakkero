@@ -1,4 +1,4 @@
-use crate::{gdt, hlt_loop, println};
+use crate::{gdt, hlt_loop};
 use lazy_static::lazy_static;
 use pic8259_simple::ChainedPics;
 use spin;
@@ -79,7 +79,7 @@ pub fn init_idt() {
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut InterruptStackFrame) {
-    println!("EXPECTION: BREAKPOINT\n{:#?}", stack_frame);
+    log::info!("EXPECTION: BREAKPOINT\n{:#?}", stack_frame);
 }
 
 extern "x86-interrupt" fn double_fault_handler(
@@ -93,13 +93,15 @@ extern "x86-interrupt" fn page_fault_handler(
     stack_frame: &mut InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
-    println!("EXCEPTION: PAGE FAULT");
-    println!(
+    use log::error;
+
+    error!("EXCEPTION: PAGE FAULT");
+    error!(
         "Accessed Address: {:?}",
         x86_64::registers::control::Cr2::read()
     );
-    println!("Error Code: {:?}", error_code);
-    println!("{:#?}", stack_frame);
+    error!("Error Code: {:?}", error_code);
+    error!("{:#?}", stack_frame);
     hlt_loop()
 }
 

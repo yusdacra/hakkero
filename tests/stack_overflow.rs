@@ -3,8 +3,7 @@
 #![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
-use hakkero::serial_print;
-use hakkero::{exit_qemu, serial_println, QemuExitCode};
+use hakkero::{exit_qemu, serial_print, serial_println, QemuExitCode};
 use lazy_static::lazy_static;
 use x86_64::structures::idt::InterruptDescriptorTable;
 use x86_64::structures::idt::InterruptStackFrame;

@@ -1,4 +1,4 @@
-use crate::{print, println};
+use crate::print;
 use core::{
     pin::Pin,
     task::{Context, Poll},
@@ -39,17 +39,17 @@ pub async fn handle_scancodes() {
 ///
 /// Must not block or allocate.
 pub(crate) fn add_scancode(scancode: u8) {
+    use log::warn;
+
     if let Some(queue) = SCANCODE_QUEUE.r#try() {
         if let Err(_) = queue.push(scancode) {
-            println!(
-                "WARNING: scancode queue full, clearing queue to avoid dropping keyboard input"
-            );
+            warn!("scancode queue full, clearing queue to avoid dropping keyboard input");
             clear_array_queue(&queue);
         } else {
             WAKER.wake();
         }
     } else {
-        println!("WARNING: scancode queue uninitialized");
+        warn!("scancode queue uninitialized");
     }
 }
 

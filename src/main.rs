@@ -10,7 +10,7 @@ extern crate alloc;
 
 use core::panic::PanicInfo;
 use hakkero::task::{
-    executor::{Executor, spawn_task},
+    executor::{spawn_task, Executor},
     keyboard, Task,
 };
 use hakkero::{println, println_colored};
@@ -18,6 +18,9 @@ use hakkero::{println, println_colored};
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
+    log::set_logger(&hakkero::vga::text::VgaLogger).expect("Could not setup logger.");
+    log::set_max_level(log::LevelFilter::Trace);
+
     // Initialize phase
     hakkero::init_heap(boot_info);
     hakkero::init();
@@ -101,7 +104,7 @@ fn tutorial_test_things() {
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
+    log::error!("{}", info);
     hakkero::hlt_loop()
 }
 

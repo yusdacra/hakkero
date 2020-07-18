@@ -26,6 +26,7 @@ lazy_static! {
 /// `core::fmt::Write` trait.
 pub struct VgaWriter<T: TextWriter + Send + Sync> {
     color: WriterColor,
+    def_color: WriterColor,
     x_pos: usize,
     iw: T,
 }
@@ -33,8 +34,10 @@ pub struct VgaWriter<T: TextWriter + Send + Sync> {
 impl<T: TextWriter + Send + Sync> VgaWriter<T> {
     /// Create a new `VgaWriter` from the given `TextWriter`.
     pub fn new(iw: T) -> Self {
+        let color = WriterColor::new(Color::White, Color::Black);
         Self {
-            color: WriterColor::new(Color::White, Color::Black),
+            color,
+            def_color: color,
             x_pos: 0,
             iw,
         }
@@ -108,7 +111,7 @@ impl<T: TextWriter + Send + Sync> VgaWriter<T> {
 
     /// Returns a blank character ' ' with current color.
     fn blank_char(&self) -> ScreenCharacter {
-        ScreenCharacter::new(b' ', self.color)
+        ScreenCharacter::new(b' ', self.def_color)
     }
 }
 
@@ -117,6 +120,32 @@ impl<T: TextWriter + Send + Sync> fmt::Write for VgaWriter<T> {
         self.write_string(s);
         Ok(())
     }
+}
+
+use log::{Log, Metadata, Record};
+
+pub struct VgaLogger;
+
+impl Log for VgaLogger {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            use log::Level;
+
+            let color = match record.level() {
+                Level::Error => WriterColor::new(Color::Black, Color::Red),
+                Level::Warn => WriterColor::new(Color::Yellow, Color::Black),
+                Level::Info => WriterColor::new(Color::Blue, Color::Black),
+                _ => WriterColor::new(Color::White, Color::Black),
+            };
+            crate::println_colored!(color, "[{:5}] {}", record.level(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
 }
 
 /// Like the `print!` macro in the standard library, but prints to the VGA text buffer.
@@ -154,7 +183,7 @@ pub fn _print_colored(args: fmt::Arguments, color: WriterColor) {
         let mut writer = WRITER.lock();
         let old_color = writer.color;
         writer.color = color;
-        write!(writer, "{}", args).unwrap();
+        write!(writer, "{}", args).expect("failed to write to vga buffer (literally how)");
         writer.color = old_color;
     });
 }
@@ -164,7 +193,9 @@ pub fn _print_colored(args: fmt::Arguments, color: WriterColor) {
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
 
-    woint(|| write!(WRITER.lock(), "{}", args).unwrap());
+    woint(|| {
+        write!(WRITER.lock(), "{}", args).expect("failed to write to vga buffer (literally how)")
+    });
 }
 
 /// Changes the global `WRITER` instance `WriterColor` to the given `WriterColor`.
