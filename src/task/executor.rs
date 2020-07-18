@@ -110,6 +110,7 @@ impl Executor {
         }))
     }
 
+    #[allow(clippy::map_entry)]
     fn run_ready_tasks(&mut self) {
         while let Ok(task) = self.waiting_for_task_queue.pop() {
             self.task_queue.push_back(task);

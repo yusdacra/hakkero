@@ -20,18 +20,21 @@ lazy_static! {
     pub static ref WRITER: Mutex<VgaWriter<DefWriter>> = Mutex::new(VgaWriter::new(DefWriter::new()));
 }
 
+/// Convenience alias.
+pub trait Writer = TextWriter + Send + Sync;
+
 /// A writer type that allows writing ASCII bytes and strings using.
 ///
 /// Wraps lines at `size.x`. Supports newline characters and implements the
 /// `core::fmt::Write` trait.
-pub struct VgaWriter<T: TextWriter + Send + Sync> {
+pub struct VgaWriter<T: Writer> {
     color: WriterColor,
     def_color: WriterColor,
     x_pos: usize,
     iw: T,
 }
 
-impl<T: TextWriter + Send + Sync> VgaWriter<T> {
+impl<T: Writer> VgaWriter<T> {
     /// Create a new `VgaWriter` from the given `TextWriter`.
     pub fn new(iw: T) -> Self {
         let color = WriterColor::new(Color::White, Color::Black);
@@ -115,7 +118,7 @@ impl<T: TextWriter + Send + Sync> VgaWriter<T> {
     }
 }
 
-impl<T: TextWriter + Send + Sync> fmt::Write for VgaWriter<T> {
+impl<T: Writer> fmt::Write for VgaWriter<T> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_string(s);
         Ok(())
@@ -224,7 +227,6 @@ fn test_println_many() {
 #[test_case]
 fn test_println_output() {
     use core::fmt::Write;
-    use vga::writers::Screen;
 
     serial_print!("test_println_output... ");
 

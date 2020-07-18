@@ -1,7 +1,6 @@
 use crate::{gdt, hlt_loop};
 use lazy_static::lazy_static;
 use pic8259_simple::ChainedPics;
-use spin;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
 #[cfg(test)]

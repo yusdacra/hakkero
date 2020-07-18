@@ -15,7 +15,7 @@ static SCANCODE_QUEUE: Once<ArrayQueue<u8>> = Once::new();
 static WAKER: AtomicWaker = AtomicWaker::new();
 
 fn clear_array_queue<T>(queue: &ArrayQueue<T>) {
-    while let Ok(_) = queue.pop() {}
+    while queue.pop().is_ok() {}
 }
 
 /// Handles scancodes asynchronously.
@@ -42,7 +42,7 @@ pub(crate) fn add_scancode(scancode: u8) {
     use log::warn;
 
     if let Some(queue) = SCANCODE_QUEUE.r#try() {
-        if let Err(_) = queue.push(scancode) {
+        if queue.push(scancode).is_err() {
             warn!("scancode queue full, clearing queue to avoid dropping keyboard input");
             clear_array_queue(&queue);
         } else {
