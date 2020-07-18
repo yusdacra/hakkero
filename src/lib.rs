@@ -7,6 +7,7 @@
 #![feature(const_fn)]
 #![feature(const_in_array_repeat_expressions)]
 #![feature(wake_trait)]
+#![feature(trait_alias)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 

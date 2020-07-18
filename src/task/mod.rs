@@ -11,6 +11,9 @@ pub mod simple_executor;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct TaskId(u64);
 
+/// Trait alias for convenience.
+pub trait TaskFuture = Future<Output = ()> + Send + Sync;
+
 impl TaskId {
     fn new() -> Self {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -20,11 +23,11 @@ impl TaskId {
 
 pub struct Task {
     id: TaskId,
-    future: Pin<Box<dyn Future<Output = ()>>>,
+    future: Pin<Box<dyn TaskFuture>>,
 }
 
 impl Task {
-    pub fn new(future: impl Future<Output = ()> + 'static) -> Task {
+    pub fn new(future: impl TaskFuture + 'static) -> Task {
         Task {
             id: TaskId::new(),
             future: Box::pin(future),

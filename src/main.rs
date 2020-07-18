@@ -10,7 +10,7 @@ extern crate alloc;
 
 use core::panic::PanicInfo;
 use hakkero::task::{
-    executor::{Executor, Spawner},
+    executor::{Executor, spawn_task},
     keyboard, Task,
 };
 use hakkero::{println, println_colored};
@@ -22,12 +22,14 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     hakkero::init_heap(boot_info);
     hakkero::init();
 
+    welcome_message();
+
     let mut executor = Executor::new();
-    executor.spawn(Task::new(start(executor.spawner())));
+    executor.spawn(Task::new(start_handlers()));
     executor.run();
 }
 
-async fn start(spawner: Spawner) {
+fn welcome_message() {
     use hakkero::vga::text::{change_writer_color as cwc, Color, WriterColor};
     cwc(WriterColor::new(Color::White, Color::Black));
 
@@ -60,12 +62,10 @@ async fn start(spawner: Spawner) {
             "Didn't crash. Am I doing something right?"
         );
     });
-
-    spawner.spawn(Task::new(start_handlers(spawner.clone())));
 }
 
-async fn start_handlers(spawner: Spawner) {
-    spawner.spawn(Task::new(keyboard::handle_scancodes()));
+async fn start_handlers() {
+    spawn_task(Task::new(keyboard::handle_scancodes()));
 }
 
 fn tutorial_test_things() {

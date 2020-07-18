@@ -6,6 +6,7 @@ use alloc::{
 };
 use core::task::{Context, Poll, Waker};
 use crossbeam_queue::ArrayQueue;
+use spin::Once;
 
 struct TaskWaker {
     task_id: TaskId,
@@ -30,17 +31,25 @@ impl Wake for TaskWaker {
     }
 }
 
-#[derive(Clone)]
-pub struct Spawner {
-    spawned_tasks: Arc<ArrayQueue<Task>>,
-}
+static SPAWNED_TASKS: Once<Arc<ArrayQueue<Task>>> = Once::new();
 
-impl Spawner {
-    pub fn spawn(&self, task: Task) {
-        self.spawned_tasks.push(task).expect("why")
+/// Queues the task to be run in the next poll.
+/// Will fail if the queue is full, or the executor has not been initialized.
+pub fn spawn_task(task: Task) {
+    match SPAWNED_TASKS.r#try() {
+        Some(s) => {
+            if s.push(task).is_err() {
+                crate::println!("can't spawn task, queue full!");
+            }
+        }
+        None => crate::println!("executor not initialized, can't spawn task"),
     }
 }
 
+/// How many tasks can be queued at the same time.
+pub const TASK_LIMIT: usize = 100;
+
+/// Simple FIFO task executor. Supports wakers.
 pub struct Executor {
     task_queue: VecDeque<Task>,
     spawned_tasks: Arc<ArrayQueue<Task>>,
@@ -51,23 +60,19 @@ pub struct Executor {
 
 impl Executor {
     pub fn new() -> Self {
+        let spawned_tasks = Arc::new(ArrayQueue::new(TASK_LIMIT));
+        SPAWNED_TASKS.call_once(|| spawned_tasks.clone());
         Executor {
             task_queue: VecDeque::new(),
-            spawned_tasks: Arc::new(ArrayQueue::new(100)),
+            spawned_tasks,
             waiting_tasks: BTreeMap::new(),
-            wake_queue: Arc::new(ArrayQueue::new(100)),
+            wake_queue: Arc::new(ArrayQueue::new(TASK_LIMIT)),
             waker_cache: BTreeMap::new(),
         }
     }
 
     pub fn spawn(&mut self, task: Task) {
         self.task_queue.push_back(task)
-    }
-
-    pub fn spawner(&self) -> Spawner {
-        Spawner {
-            spawned_tasks: self.spawned_tasks.clone(),
-        }
     }
 
     pub fn run(&mut self) -> ! {
