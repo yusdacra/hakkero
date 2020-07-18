@@ -8,32 +8,37 @@ image: "liuchong/rustup:nightly"
 
 stages:
   - check
-  - test
 
 # Setup qemu, nightly compiler and cargo tools
 before_script:
     - apt-get update && apt-get install -yqq --no-install-recommends qemu-system-x86
     - rustup component add rust-src llvm-tools-preview
     - cargo install bootimage cargo-xbuild
+    - rustc --version && cargo --version
 
-# Use cargo check the project
-check:cargo:
+check:
   stage: check
   cache:
     key: "cache-linux"
     paths:
         - ./target
   script:
-    - rustc --version && cargo --version  # Print version info for debugging
     - cargo xcheck --verbose
 
-# Use cargo to test the project
-test:cargo:
-  stage: test
+test:
+  stage: check
   cache:
     key: "cache-linux"
     paths:
         - ./target
   script:
-    - rustc --version && cargo --version  # Print version info for debugging
     - cargo xtest --all --verbose
+
+clippy:
+  stage: check
+  cache:
+    key: "cache-linux"
+    paths:
+        - ./target
+  script:
+    - cargo xclippy --verbose
