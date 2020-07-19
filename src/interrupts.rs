@@ -108,7 +108,7 @@ extern "x86-interrupt" fn page_fault_handler(
 
 #[test_case]
 fn test_breakpoint_exception() {
-    serial_print!("running test 'test_breakpoint_exception'...");
+    serial_print!("test_breakpoint_exception... ");
     // invoke a breakpoint exception
     x86_64::instructions::interrupts::int3();
     serial_println!("[ok]");

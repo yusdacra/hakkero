@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 
 use vga::colors::{Color16, TextModeColor};
-use vga::writers::{ScreenCharacter, Text80x25, TextWriter};
+use vga::writers::{ScreenCharacter, TextWriter};
 
 use crate::woint;
 #[cfg(test)]
@@ -11,7 +11,7 @@ use crate::{serial_print, serial_println};
 
 pub type Color = Color16;
 pub type WriterColor = TextModeColor;
-type DefWriter = Text80x25;
+type DefWriter = vga::writers::Text80x25;
 
 lazy_static! {
     /// A global `Writer` instance that can be used for printing to the VGA text buffer.
@@ -38,6 +38,7 @@ impl<T: Writer> VgaWriter<T> {
     /// Create a new `VgaWriter` from the given `TextWriter`.
     pub fn new(iw: T) -> Self {
         let color = WriterColor::new(Color::White, Color::Black);
+        iw.set_mode();
         Self {
             color,
             def_color: color,
@@ -67,9 +68,6 @@ impl<T: Writer> VgaWriter<T> {
     /// mode.
     fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
-            if self.x_pos >= T::WIDTH {
-                self.new_line();
-            }
             match byte {
                 // printable ASCII byte
                 0x20..=0x7e => self.write_byte(byte),
@@ -82,6 +80,9 @@ impl<T: Writer> VgaWriter<T> {
                 _ => self.write_byte(0xfe),
             }
             self.x_pos += 1;
+            if self.x_pos >= T::WIDTH {
+                self.new_line();
+            }
         }
         // Update cursor position
         self.iw.set_cursor_position(self.x_pos, T::HEIGHT - 1);
@@ -230,15 +231,54 @@ fn test_println_output() {
 
     serial_print!("test_println_output... ");
 
-    let s = "Some test string that fits on a single line";
+    let s = "1234567890";
     woint(|| {
         let mut writer = WRITER.lock();
         writeln!(writer, "\n{}", s).expect("writeln failed");
         for (i, c) in s.chars().enumerate() {
             let screen_char = writer.iw.read_character(i, DefWriter::HEIGHT - 2);
-            assert_eq!(char::from(screen_char.get_character()), c);
+            assert_eq!(screen_char.get_character(), c as u8);
         }
     });
+
+    serial_println!("[ok]");
+}
+
+#[test_case]
+fn test_println_fit_line_output() {
+    serial_print!("test_println_fit_line_output... ");
+
+    for _ in 0..DefWriter::WIDTH {
+        print!("a");
+    }
+    let writer = WRITER.lock();
+    assert_eq!(
+        char::from(
+            writer
+                .get_iw()
+                .read_character(writer.x_pos, DefWriter::HEIGHT - 1)
+                .get_character()
+        ),
+        ' '
+    );
+
+    serial_println!("[ok]");
+}
+
+#[test_case]
+fn test_clear_screen() {
+    serial_print!("test_clear_screen... ");
+
+    let writer = WRITER.lock();
+    writer
+        .get_iw()
+        .fill_screen(ScreenCharacter::new(b'a', writer.def_color));
+    writer.clear_screen();
+    for y in 0..DefWriter::HEIGHT {
+        for x in 0..DefWriter::WIDTH {
+            assert_eq!(writer.get_iw().read_character(x, y).get_character(), b' ');
+        }
+    }
 
     serial_println!("[ok]");
 }
