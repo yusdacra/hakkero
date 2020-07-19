@@ -10,7 +10,8 @@ use x86_64::structures::idt::InterruptStackFrame;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    serial_print!("stack_overflow...");
+    let mut sp = hakkero::serial::create_qemu_sp();
+    serial_print!(&mut sp, "stack_overflow...");
 
     hakkero::gdt::init();
     init_test_idt();
@@ -53,7 +54,8 @@ extern "x86-interrupt" fn test_double_fault_handler(
     _stack_frame: &mut InterruptStackFrame,
     _error_code: u64,
 ) -> ! {
-    serial_println!("[ok]");
+    let mut sp = hakkero::serial::create_qemu_sp();
+    serial_println!(&mut sp, "[ok]");
     exit_qemu(QemuExitCode::Success);
     loop {}
 }

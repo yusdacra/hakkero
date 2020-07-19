@@ -5,7 +5,7 @@
 #![reexport_test_harness_main = "test_main"]
 
 use core::panic::PanicInfo;
-use hakkero::{println, serial_print, serial_println};
+use hakkero::{serial_print, serial_println};
 
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn _start() -> ! {
@@ -20,8 +20,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 #[test_case]
-fn test_println() {
-    serial_print!("test_println... ");
-    println!("test_println output");
-    serial_println!("[ok]");
+fn test_println(sp: &mut hakkero::serial::SerialPort) {
+    serial_print!(sp, "test_println... ");
+    serial_println!(sp, "[ok]");
 }

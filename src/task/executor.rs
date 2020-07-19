@@ -49,7 +49,7 @@ pub fn spawn_task(task: Task) {
     }
 }
 
-/// How many tasks / wakers can be queued at the same time.
+/// How many tasks / wakers can be queued.
 pub const TASK_QUEUE_LIMIT: usize = 100;
 
 /// Simple FIFO task executor. Supports wakers.

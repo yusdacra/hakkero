@@ -1,7 +1,3 @@
-use core::fmt;
-use lazy_static::lazy_static;
-use spin::Mutex;
-
 use vga::colors::{Color16, TextModeColor};
 use vga::writers::{ScreenCharacter, TextWriter};
 
@@ -9,16 +5,7 @@ use crate::woint;
 #[cfg(test)]
 use crate::{serial_print, serial_println};
 
-pub type Color = Color16;
-pub type WriterColor = TextModeColor;
-type DefWriter = vga::writers::Text80x25;
-
-lazy_static! {
-    /// A global `Writer` instance that can be used for printing to the VGA text buffer.
-    ///
-    /// Used by the `print!` and `println!` macros.
-    pub static ref WRITER: Mutex<VgaWriter<DefWriter>> = Mutex::new(VgaWriter::new(DefWriter::new()));
-}
+pub type VgaWriterColor = TextModeColor;
 
 /// Convenience alias.
 pub trait Writer = TextWriter + Send + Sync;
@@ -28,8 +15,8 @@ pub trait Writer = TextWriter + Send + Sync;
 /// Wraps lines at `size.x`. Supports newline characters and implements the
 /// `core::fmt::Write` trait.
 pub struct VgaWriter<T: Writer> {
-    color: WriterColor,
-    def_color: WriterColor,
+    color: VgaWriterColor,
+    def_color: VgaWriterColor,
     x_pos: usize,
     iw: T,
 }
@@ -37,7 +24,7 @@ pub struct VgaWriter<T: Writer> {
 impl<T: Writer> VgaWriter<T> {
     /// Create a new `VgaWriter` from the given `TextWriter`.
     pub fn new(iw: T) -> Self {
-        let color = WriterColor::new(Color::White, Color::Black);
+        let color = VgaWriterColor::new(Color16::White, Color16::Black);
         iw.set_mode();
         Self {
             color,
@@ -119,18 +106,29 @@ impl<T: Writer> VgaWriter<T> {
     }
 }
 
-impl<T: Writer> fmt::Write for VgaWriter<T> {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
+impl<T: Writer> core::fmt::Write for VgaWriter<T> {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.write_string(s);
         Ok(())
     }
 }
 
+use alloc::sync::Arc;
 use log::{Log, Metadata, Record};
+use spin::Mutex;
 
-pub struct VgaLogger;
+// TODO: Remove the `Arc` (so, don't allocate) so that we can use it before allocator initialization.
+pub struct VgaLogger<T: Writer> {
+    ivw: Arc<Mutex<VgaWriter<T>>>,
+}
 
-impl Log for VgaLogger {
+impl<T: Writer> VgaLogger<T> {
+    pub fn new(ivw: Arc<Mutex<VgaWriter<T>>>) -> Self {
+        Self { ivw }
+    }
+}
+
+impl<T: Writer> Log for VgaLogger<T> {
     fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }
@@ -140,12 +138,18 @@ impl Log for VgaLogger {
             use log::Level;
 
             let color = match record.level() {
-                Level::Error => WriterColor::new(Color::Black, Color::Red),
-                Level::Warn => WriterColor::new(Color::Yellow, Color::Black),
-                Level::Info => WriterColor::new(Color::Blue, Color::Black),
-                _ => WriterColor::new(Color::White, Color::Black),
+                Level::Error => VgaWriterColor::new(Color16::Black, Color16::Red),
+                Level::Warn => VgaWriterColor::new(Color16::Yellow, Color16::Black),
+                Level::Info => VgaWriterColor::new(Color16::Blue, Color16::Black),
+                _ => VgaWriterColor::new(Color16::White, Color16::Black),
             };
-            crate::println_colored!(color, "[{:5}] {}", record.level(), record.args());
+            crate::println_colored!(
+                &mut self.ivw.lock(),
+                color,
+                "[{:5}] {}",
+                record.level(),
+                record.args()
+            );
         }
     }
 
@@ -155,36 +159,39 @@ impl Log for VgaLogger {
 /// Like the `print!` macro in the standard library, but prints to the VGA text buffer.
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga::text::_print(format_args!($($arg)*)));
+    ($writer:expr, $($arg:tt)*) => ($crate::vga::writer::_print($writer, format_args!($($arg)*)));
 }
 
 /// Like the `println!` macro in the standard library, but prints to the VGA text buffer.
 #[macro_export]
 macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+    ($writer:expr) => ($crate::print!($writer, "\n"));
+    ($writer:expr, $($arg:tt)*) => ($crate::print!($writer, "{}\n", format_args!($($arg)*)));
 }
 
 /// Prints text to VGA buffer colored with given color.
 #[macro_export]
 macro_rules! print_colored {
-    ($color:expr, $($arg:tt)*) => ($crate::vga::text::_print_colored(format_args!($($arg)*), $color));
+    ($writer:expr, $color:expr, $($arg:tt)*) => ($crate::vga::writer::_print_colored($writer, $color, format_args!($($arg)*)));
 }
 
 /// Prints text to VGA buffer colored with given color, but with a new line at the end.
 #[macro_export]
 macro_rules! println_colored {
-    ($color:expr) => ($crate::print_colored!($color, "\n"));
-    ($color:expr, $($arg:tt)*) => ($crate::print_colored!($color, "{}\n", format_args!($($arg)*)));
+    ($writer:expr, $color:expr) => ($crate::print_colored!($writer, $color, "\n"));
+    ($writer:expr, $color:expr, $($arg:tt)*) => ($crate::print_colored!($writer, $color, "{}\n", format_args!($($arg)*)));
 }
 
 #[doc(hidden)]
-/// Prints the text colored in given `WriterColor`. Changes the colors to old colors when printing finishes.
-pub fn _print_colored(args: fmt::Arguments, color: WriterColor) {
+/// Writes the text colored in given `VgaWriterColor` to given `VgaWriter`. Changes the colors to old colors when printing finishes.
+pub fn _print_colored<T: Writer>(
+    writer: &mut VgaWriter<T>,
+    color: VgaWriterColor,
+    args: core::fmt::Arguments,
+) {
     use core::fmt::Write;
 
     woint(|| {
-        let mut writer = WRITER.lock();
         let old_color = writer.color;
         writer.color = color;
         write!(writer, "{}", args).expect("failed to write to vga buffer (literally how)");
@@ -193,92 +200,91 @@ pub fn _print_colored(args: fmt::Arguments, color: WriterColor) {
 }
 
 #[doc(hidden)]
-/// Prints the given formatted string to the VGA text buffer through the global `WRITER` instance.
-pub fn _print(args: fmt::Arguments) {
+/// Writes the given formatted string to the VGA text buffer through the given `VgaWriter`.
+pub fn _print<T: Writer>(writer: &mut VgaWriter<T>, args: core::fmt::Arguments) {
     use core::fmt::Write;
 
-    woint(|| {
-        write!(WRITER.lock(), "{}", args).expect("failed to write to vga buffer (literally how)")
-    });
+    woint(|| write!(writer, "{}", args).expect("failed to write to vga buffer (literally how)"));
 }
 
-/// Changes the global `WRITER` instance `WriterColor` to the given `WriterColor`.
-pub fn change_writer_color(color: WriterColor) {
-    woint(|| {
-        WRITER.lock().color = color;
-    })
+#[cfg(test)]
+use vga::writers::Text80x25;
+
+#[test_case]
+fn test_println_simple(sp: &mut crate::serial::SerialPort) {
+    let mut writer = VgaWriter::new(Text80x25::new());
+
+    serial_print!(sp, "test_println... ");
+    println!(&mut writer, "test_println_simple output");
+    serial_println!(sp, "[ok]");
 }
 
 #[test_case]
-fn test_println_simple() {
-    serial_print!("test_println... ");
-    println!("test_println_simple output");
-    serial_println!("[ok]");
-}
+fn test_println_many(sp: &mut crate::serial::SerialPort) {
+    let mut writer = VgaWriter::new(Text80x25::new());
 
-#[test_case]
-fn test_println_many() {
-    serial_print!("test_println_many... ");
+    serial_print!(sp, "test_println_many... ");
     for _ in 0..200 {
-        println!("test_println_many output");
+        println!(&mut writer, "test_println_many output");
     }
-    serial_println!("[ok]");
+    serial_println!(sp, "[ok]");
 }
 
 #[test_case]
-fn test_println_output() {
-    use core::fmt::Write;
+fn test_println_output(sp: &mut crate::serial::SerialPort) {
+    let mut writer = VgaWriter::new(Text80x25::new());
 
-    serial_print!("test_println_output... ");
+    serial_print!(sp, "test_println_output... ");
 
     let s = "1234567890";
     woint(|| {
-        let mut writer = WRITER.lock();
-        writeln!(writer, "\n{}", s).expect("writeln failed");
+        println!(&mut writer, "\n{}", s);
         for (i, c) in s.chars().enumerate() {
-            let screen_char = writer.iw.read_character(i, DefWriter::HEIGHT - 2);
+            let screen_char = writer.iw.read_character(i, Text80x25::HEIGHT - 2);
             assert_eq!(screen_char.get_character(), c as u8);
         }
     });
 
-    serial_println!("[ok]");
+    serial_println!(sp, "[ok]");
 }
 
 #[test_case]
-fn test_println_fit_line_output() {
-    serial_print!("test_println_fit_line_output... ");
+fn test_println_fit_line_output(sp: &mut crate::serial::SerialPort) {
+    let mut writer = VgaWriter::new(Text80x25::new());
 
-    for _ in 0..DefWriter::WIDTH {
-        print!("a");
+    serial_print!(sp, "test_println_fit_line_output... ");
+
+    for _ in 0..Text80x25::WIDTH {
+        print!(&mut writer, "a");
     }
-    let writer = WRITER.lock();
     assert_eq!(
         char::from(
             writer
                 .get_iw()
-                .read_character(writer.x_pos, DefWriter::HEIGHT - 1)
+                .read_character(writer.x_pos, Text80x25::HEIGHT - 1)
                 .get_character()
         ),
         ' '
     );
 
-    serial_println!("[ok]");
+    serial_println!(sp, "[ok]");
 }
 
 #[test_case]
-fn test_clear_screen() {
-    serial_print!("test_clear_screen... ");
+fn test_clear_screen(sp: &mut crate::serial::SerialPort) {
+    let writer = VgaWriter::new(Text80x25::new());
 
-    let writer = WRITER.lock();
+    serial_print!(sp, "test_clear_screen... ");
+
     writer
         .get_iw()
         .fill_screen(ScreenCharacter::new(b'a', writer.def_color));
     writer.clear_screen();
-    for y in 0..DefWriter::HEIGHT {
-        for x in 0..DefWriter::WIDTH {
+    for y in 0..Text80x25::HEIGHT {
+        for x in 0..Text80x25::WIDTH {
             assert_eq!(writer.get_iw().read_character(x, y).get_character(), b' ');
         }
     }
 
-    serial_println!("[ok]");
+    serial_println!(sp, "[ok]");
 }

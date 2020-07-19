@@ -49,17 +49,21 @@ pub fn init_heap(boot_info: &'static bootloader::BootInfo) {
     allocator::setup_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 }
 
-pub fn test_runner(tests: &[&dyn Fn()]) {
-    serial_println!("Running {} tests", tests.len());
+pub fn test_runner(tests: &[&dyn Fn(&mut serial::SerialPort)]) {
+    let mut sp = serial::create_qemu_sp();
+
+    serial_println!(&mut sp, "Running {} tests", tests.len());
     for test in tests {
-        test();
+        test(&mut sp);
     }
     exit_qemu(QemuExitCode::Success);
 }
 
 pub fn test_panic_handler(info: &PanicInfo) -> ! {
-    serial_println!("[failed]\n");
-    serial_println!("Error: {}\n", info);
+    let mut sp = serial::create_qemu_sp();
+
+    serial_println!(&mut sp, "[failed]\n");
+    serial_println!(&mut sp, "Error: {}\n", info);
     exit_qemu(QemuExitCode::Failed);
     hlt_loop()
 }

@@ -1,4 +1,3 @@
-use crate::print;
 use core::{
     pin::Pin,
     task::{Context, Poll},
@@ -11,8 +10,11 @@ use spin::Once;
 
 const SC_CAP: usize = 100;
 /// Holds scancodes added by `add_scancode`.
-static SCANCODE_QUEUE: Once<ArrayQueue<u8>> = Once::new();
-static WAKER: AtomicWaker = AtomicWaker::new();
+static SCANCODES: Once<ArrayQueue<u8>> = Once::new();
+static SCANCODES_WAKER: AtomicWaker = AtomicWaker::new();
+
+static DECODED_KEYS: Once<ArrayQueue<DecodedKey>> = Once::new();
+static DECODED_KEYS_WAKER: AtomicWaker = AtomicWaker::new();
 
 fn clear_array_queue<T>(queue: &ArrayQueue<T>) {
     while queue.pop().is_ok() {}
@@ -20,15 +22,22 @@ fn clear_array_queue<T>(queue: &ArrayQueue<T>) {
 
 /// Handles scancodes asynchronously.
 pub async fn handle_scancodes() {
+    DECODED_KEYS.call_once(|| ArrayQueue::new(SC_CAP));
+
     let mut scancodes = ScancodeStream::new();
     let mut keyboard = Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore);
 
     while let Some(scancode) = scancodes.next().await {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
-                match key {
-                    DecodedKey::Unicode(character) => print!("{}", character),
-                    DecodedKey::RawKey(_raw) => (),
+                match DECODED_KEYS.r#try() {
+                    Some(d) => {
+                        if d.push(key).is_err() {
+                            log::warn!("decoded key queue full")
+                        }
+                        DECODED_KEYS_WAKER.wake();
+                    }
+                    None => log::warn!("decoded key queue uninitialized"),
                 }
             }
         }
@@ -41,12 +50,12 @@ pub async fn handle_scancodes() {
 pub(crate) fn add_scancode(scancode: u8) {
     use log::warn;
 
-    if let Some(queue) = SCANCODE_QUEUE.r#try() {
+    if let Some(queue) = SCANCODES.r#try() {
         if queue.push(scancode).is_err() {
             warn!("scancode queue full, clearing queue to avoid dropping keyboard input");
             clear_array_queue(&queue);
         } else {
-            WAKER.wake();
+            SCANCODES_WAKER.wake();
         }
     } else {
         warn!("scancode queue uninitialized");
@@ -60,7 +69,7 @@ pub struct ScancodeStream {
 
 impl ScancodeStream {
     pub fn new() -> Self {
-        SCANCODE_QUEUE.call_once(|| ArrayQueue::new(SC_CAP));
+        SCANCODES.call_once(|| ArrayQueue::new(SC_CAP));
         ScancodeStream { _private: () }
     }
 }
@@ -68,18 +77,42 @@ impl ScancodeStream {
 impl Stream for ScancodeStream {
     type Item = u8;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<u8>> {
-        let queue = SCANCODE_QUEUE.r#try().expect("not initialized");
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        let queue = SCANCODES.r#try().expect("not initialized");
 
         if let Ok(scancode) = queue.pop() {
             return Poll::Ready(Some(scancode));
         }
 
-        WAKER.register(&cx.waker());
+        SCANCODES_WAKER.register(&cx.waker());
         match queue.pop() {
             Ok(scancode) => {
-                WAKER.take();
+                SCANCODES_WAKER.take();
                 Poll::Ready(Some(scancode))
+            }
+            Err(crossbeam_queue::PopError) => Poll::Pending,
+        }
+    }
+}
+
+/// Polls `DecodedKey`s from `DECODED_KEYS`.
+pub struct DecodedKeyStream;
+
+impl Stream for DecodedKeyStream {
+    type Item = DecodedKey;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        let queue = DECODED_KEYS.r#try().expect("not initialized");
+
+        if let Ok(key) = queue.pop() {
+            return Poll::Ready(Some(key));
+        }
+
+        DECODED_KEYS_WAKER.register(&cx.waker());
+        match queue.pop() {
+            Ok(key) => {
+                DECODED_KEYS_WAKER.take();
+                Poll::Ready(Some(key))
             }
             Err(crossbeam_queue::PopError) => Poll::Pending,
         }

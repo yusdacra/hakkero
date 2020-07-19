@@ -8,93 +8,108 @@
 use bootloader::{entry_point, BootInfo};
 extern crate alloc;
 
+use alloc::sync::Arc;
 use core::panic::PanicInfo;
+use hakkero::serial::SerialLogger;
 use hakkero::task::{
     executor::{spawn_task, Executor},
     keyboard, Task,
 };
-use hakkero::{println, println_colored};
+use hakkero::vga::VgaWriter;
+use spin::Mutex;
+use vga::writers::Text80x25;
+
+lazy_static::lazy_static! {
+    static ref WRITER: Arc<Mutex<VgaWriter<Text80x25>>> = Arc::new(Mutex::new(VgaWriter::new(Text80x25::new())));
+}
+
+// NOTE: lazy_static doesn't work with set_logger for some reason (weird "`Log` not implemented for `LOGGER`" error) so we use `Once`
+static LOGGER: SerialLogger = SerialLogger::new_qemu();
 
 entry_point!(kernel_main);
-
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    log::set_logger(&hakkero::vga::text::VgaLogger).expect("Could not setup logger.");
+    // Set up logger
+    // TODO: Look into using `set_logger_boxed` (fork `log` and use `alloc` instead of `std` in feature? (maybe even make a PR for that?))
+    log::set_logger(&LOGGER).expect("Could not setup logger.");
     log::set_max_level(log::LevelFilter::Trace);
 
     // Initialize phase
-    hakkero::init_heap(boot_info);
     hakkero::init();
+    hakkero::init_heap(boot_info);
 
-    welcome_message();
+    // We run tests before everything to avoid interference
+    #[cfg(test)]
+    test_main();
+
+    some_info();
+    tutorial_test_things();
+
+    {
+        use hakkero::vga::VgaWriterColor;
+        use vga::colors::Color16;
+        hakkero::println_colored!(
+            &mut WRITER.lock(),
+            VgaWriterColor::new(Color16::Red, Color16::Black),
+            "Welcome to Hakkero OS!\n"
+        );
+    }
 
     let mut executor = Executor::new();
     executor.spawn(Task::new(start_handlers()));
     executor.run();
 }
 
-fn welcome_message() {
-    use hakkero::vga::text::{change_writer_color as cwc, Color, WriterColor};
-    cwc(WriterColor::new(Color::White, Color::Black));
+fn some_info() {
+    use log::info;
 
-    // Show welcome text and run tests
-    hakkero::woint(|| {
-        // Welcome text
-        println_colored!(
-            WriterColor::new(Color::LightRed, Color::Black),
-            "Welcome to, 
-                                         __   __ 
-     /  |      /    /                   /  | /   
-    (___| ___ (    (     ___  ___  ___ (   |(___ 
-    |   )|   )|___)|___)|___)|   )|   )|   )    )
-    |  / |__/|| \\  | \\  |__  |    |__/ |__/  __/
-
-(*very* powerful furnace OS)\n",
-        );
-
-        println_colored!(
-            WriterColor::new(Color::LightBlue, Color::Black),
-            "*cough* Testing..."
-        );
-        tutorial_test_things();
-
-        #[cfg(test)]
-        test_main();
-
-        println_colored!(
-            WriterColor::new(Color::LightGreen, Color::Black),
-            "Didn't crash. Am I doing something right?"
-        );
-    });
+    info!("Heap start: {}", hakkero::allocator::HEAP_START);
+    info!("Heap size: {}\n", hakkero::allocator::HEAP_SIZE);
 }
 
 async fn start_handlers() {
     spawn_task(Task::new(keyboard::handle_scancodes()));
+    spawn_task(Task::new(handle_decoded_keys()));
+}
+
+async fn handle_decoded_keys() {
+    use futures_util::stream::StreamExt;
+    let mut queue = hakkero::task::keyboard::DecodedKeyStream;
+
+    while let Some(key) = queue.next().await {
+        match key {
+            pc_keyboard::DecodedKey::Unicode(character) => {
+                hakkero::print!(&mut WRITER.lock(), "{}", character)
+            }
+            pc_keyboard::DecodedKey::RawKey(_) => (),
+        }
+    }
 }
 
 fn tutorial_test_things() {
     use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
+    use log::trace;
 
     // allocate a number on the heap
     let heap_value = Box::new(23);
-    println!("heap_value at {:p}", heap_value);
+    trace!("heap_value at {:p}", heap_value);
 
     // create a dynamically sized vector
     let mut vec = Vec::new();
     for i in 0..500 {
         vec.push(i);
     }
-    println!("vec at {:p}", vec.as_slice());
+    trace!("vec at {:p}", vec.as_slice());
 
     // create a reference counted vector -> will be freed when count reaches 0
     let reference_counted = Rc::new(vec![1, 2, 3]);
     let cloned_reference = reference_counted.clone();
-    println!(
+    trace!(
         "Current reference count is {}",
         Rc::strong_count(&cloned_reference)
     );
-    println!("Dropping `reference_counted`");
+    trace!("Dropping `reference_counted`");
     core::mem::drop(reference_counted);
-    println!(
+    trace!(
         "Now, reference count is {}",
         Rc::strong_count(&cloned_reference)
     );
