@@ -30,14 +30,13 @@ pub async fn handle_scancodes() {
     while let Some(scancode) = scancodes.next().await {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
-                match DECODED_KEYS.r#try() {
-                    Some(d) => {
-                        if d.push(key).is_err() {
-                            log::warn!("decoded key queue full")
-                        }
-                        DECODED_KEYS_WAKER.wake();
+                if let Some(d) = DECODED_KEYS.r#try() {
+                    if d.push(key).is_err() {
+                        log::warn!("decoded key queue full");
                     }
-                    None => log::warn!("decoded key queue uninitialized"),
+                    DECODED_KEYS_WAKER.wake();
+                } else {
+                    log::warn!("decoded key queue uninitialized");
                 }
             }
         }

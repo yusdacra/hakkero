@@ -39,13 +39,12 @@ static WFTQ: Once<Arc<ArrayQueue<Task>>> = Once::new();
 pub fn spawn_task(task: Task) {
     use log::warn;
 
-    match WFTQ.r#try() {
-        Some(s) => {
-            if s.push(task).is_err() {
-                warn!("can't spawn task, queue full!");
-            }
+    if let Some(s) = WFTQ.r#try() {
+        if s.push(task).is_err() {
+            warn!("can't spawn task, queue full!");
         }
-        None => warn!("executor not initialized, can't spawn task"),
+    } else {
+        warn!("executor not initialized, can't spawn task");
     }
 }
 
@@ -110,7 +109,6 @@ impl Executor {
         }))
     }
 
-    #[allow(clippy::map_entry)]
     fn run_ready_tasks(&mut self) {
         while let Ok(task) = self.waiting_for_task_queue.pop() {
             self.task_queue.push_back(task);
@@ -118,6 +116,7 @@ impl Executor {
         while let Some(mut task) = self.task_queue.pop_front() {
             let task_id = task.id;
             // Create a new `Waker` if it isn't already in the cache.
+            #[allow(clippy::map_entry)]
             if !self.waker_cache.contains_key(&task_id) {
                 self.waker_cache.insert(task_id, self.create_waker(task_id));
             }

@@ -64,7 +64,6 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: &mut Interrup
 }
 
 /// Convenience function to notify the end of an interrupt.
-#[inline(always)]
 fn send_eoi(int_index: InterruptIndex) {
     unsafe {
         PICS.lock().notify_end_of_interrupt(int_index.as_u8());

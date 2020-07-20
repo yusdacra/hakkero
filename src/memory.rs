@@ -9,7 +9,7 @@ use x86_64::{
     VirtAddr,
 };
 
-/// A FrameAllocator that always returns `None`.
+/// A `FrameAllocator` that always returns `None`.
 pub struct EmptyFrameAllocator;
 
 unsafe impl FrameAllocator<Size4KiB> for EmptyFrameAllocator {
@@ -18,14 +18,14 @@ unsafe impl FrameAllocator<Size4KiB> for EmptyFrameAllocator {
     }
 }
 
-/// A FrameAllocator that returns usable frames from the bootloader's memory map.
+/// A `FrameAllocator` that returns usable frames from the bootloader's memory map.
 pub struct BootInfoFrameAllocator {
     memory_map: &'static MemoryMap,
     next: usize,
 }
 
 impl BootInfoFrameAllocator {
-    /// Create a FrameAllocator from the passed memory map.
+    /// Create a `FrameAllocator` from the passed memory map.
     ///
     /// # Safety
     /// This function is unsafe because the caller must guarantee that the passed
@@ -60,7 +60,7 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     }
 }
 
-/// Initialize a new OffsetPageTable.
+/// Initialize a new `OffsetPageTable`.
 ///
 /// # Safety
 /// This function is unsafe because the caller must guarantee that the

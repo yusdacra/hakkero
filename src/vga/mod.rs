@@ -1,3 +1,3 @@
-pub mod writer;
+pub mod text;
 
-pub use writer::{VgaLogger, VgaWriter, VgaWriterColor};
+pub use text::{readline::Readline, Logger, Writer, WriterColor};

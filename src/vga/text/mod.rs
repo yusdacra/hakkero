@@ -1,30 +1,26 @@
-use vga::colors::{Color16, TextModeColor};
-use vga::writers::{ScreenCharacter, TextWriter};
+pub mod readline;
 
 use crate::woint;
-#[cfg(test)]
-use crate::{serial_print, serial_println};
+use vga::colors::{Color16, TextModeColor};
+use vga::writers::{ScreenCharacter, Text80x25, TextWriter};
 
-pub type VgaWriterColor = TextModeColor;
-
-/// Convenience alias.
-pub trait Writer = TextWriter + Send + Sync;
+pub type WriterColor = TextModeColor;
 
 /// A writer type that allows writing ASCII bytes and strings using.
 ///
 /// Wraps lines at `size.x`. Supports newline characters and implements the
 /// `core::fmt::Write` trait.
-pub struct VgaWriter<T: Writer> {
-    color: VgaWriterColor,
-    def_color: VgaWriterColor,
+pub struct Writer<T: TextWriter> {
+    color: WriterColor,
+    def_color: WriterColor,
     x_pos: usize,
     iw: T,
 }
 
-impl<T: Writer> VgaWriter<T> {
-    /// Create a new `VgaWriter` from the given `TextWriter`.
+impl<T: TextWriter> Writer<T> {
+    /// Create a new `Writer` from the given `TextWriter`.
     pub fn new(iw: T) -> Self {
-        let color = VgaWriterColor::new(Color16::White, Color16::Black);
+        let color = WriterColor::new(Color16::White, Color16::Black);
         iw.set_mode();
         Self {
             color,
@@ -106,28 +102,33 @@ impl<T: Writer> VgaWriter<T> {
     }
 }
 
-impl<T: Writer> core::fmt::Write for VgaWriter<T> {
+impl<T: TextWriter> core::fmt::Write for Writer<T> {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.write_string(s);
         Ok(())
     }
 }
 
+impl Default for Writer<Text80x25> {
+    fn default() -> Self {
+        Self::new(Text80x25::new())
+    }
+}
+
 use log::{Log, Metadata, Record};
 use spin::Mutex;
 
-// TODO: Remove the `Arc` (so, don't allocate) so that we can use it before allocator initialization.
-pub struct VgaLogger<T: 'static + Writer> {
-    ivw: &'static Mutex<VgaWriter<T>>,
+pub struct Logger<T: 'static + TextWriter + Send + Sync> {
+    ivw: &'static Mutex<Writer<T>>,
 }
 
-impl<T: 'static + Writer> VgaLogger<T> {
-    pub fn new(ivw: &'static Mutex<VgaWriter<T>>) -> Self {
+impl<T: 'static + TextWriter + Send + Sync> Logger<T> {
+    pub fn new(ivw: &'static Mutex<Writer<T>>) -> Self {
         Self { ivw }
     }
 }
 
-impl<T: 'static + Writer> Log for VgaLogger<T> {
+impl<T: 'static + TextWriter + Send + Sync> Log for Logger<T> {
     fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }
@@ -137,10 +138,10 @@ impl<T: 'static + Writer> Log for VgaLogger<T> {
             use log::Level;
 
             let color = match record.level() {
-                Level::Error => VgaWriterColor::new(Color16::Black, Color16::Red),
-                Level::Warn => VgaWriterColor::new(Color16::Yellow, Color16::Black),
-                Level::Info => VgaWriterColor::new(Color16::LightBlue, Color16::Black),
-                _ => VgaWriterColor::new(Color16::White, Color16::Black),
+                Level::Error => WriterColor::new(Color16::Black, Color16::Red),
+                Level::Warn => WriterColor::new(Color16::Yellow, Color16::Black),
+                Level::Info => WriterColor::new(Color16::LightBlue, Color16::Black),
+                _ => WriterColor::new(Color16::White, Color16::Black),
             };
             crate::println_colored!(
                 &mut self.ivw.lock(),
@@ -158,7 +159,7 @@ impl<T: 'static + Writer> Log for VgaLogger<T> {
 /// Like the `print!` macro in the standard library, but prints to the VGA text buffer.
 #[macro_export]
 macro_rules! print {
-    ($writer:expr, $($arg:tt)*) => ($crate::vga::writer::_print($writer, format_args!($($arg)*)));
+    ($writer:expr, $($arg:tt)*) => ($crate::vga::text::_print($writer, format_args!($($arg)*)));
 }
 
 /// Like the `println!` macro in the standard library, but prints to the VGA text buffer.
@@ -171,7 +172,7 @@ macro_rules! println {
 /// Prints text to VGA buffer colored with given color.
 #[macro_export]
 macro_rules! print_colored {
-    ($writer:expr, $color:expr, $($arg:tt)*) => ($crate::vga::writer::_print_colored($writer, $color, format_args!($($arg)*)));
+    ($writer:expr, $color:expr, $($arg:tt)*) => ($crate::vga::text::_print_colored($writer, $color, format_args!($($arg)*)));
 }
 
 /// Prints text to VGA buffer colored with given color, but with a new line at the end.
@@ -182,10 +183,10 @@ macro_rules! println_colored {
 }
 
 #[doc(hidden)]
-/// Writes the text colored in given `VgaWriterColor` to given `VgaWriter`. Changes the colors to old colors when printing finishes.
-pub fn _print_colored<T: Writer>(
-    writer: &mut VgaWriter<T>,
-    color: VgaWriterColor,
+/// Writes the text colored in given `WriterColor` to given `Writer`. Changes the colors to old colors when printing finishes.
+pub fn _print_colored<T: TextWriter>(
+    writer: &mut Writer<T>,
+    color: WriterColor,
     args: core::fmt::Arguments,
 ) {
     use core::fmt::Write;
@@ -199,19 +200,23 @@ pub fn _print_colored<T: Writer>(
 }
 
 #[doc(hidden)]
-/// Writes the given formatted string to the VGA text buffer through the given `VgaWriter`.
-pub fn _print<T: Writer>(writer: &mut VgaWriter<T>, args: core::fmt::Arguments) {
+/// Writes the given formatted string to the VGA text buffer through the given `Writer`.
+pub fn _print<T: TextWriter>(writer: &mut Writer<T>, args: core::fmt::Arguments) {
     use core::fmt::Write;
 
     woint(|| write!(writer, "{}", args).expect("failed to write to vga buffer (literally how)"));
 }
 
+// TESTS
+
 #[cfg(test)]
-use vga::writers::Text80x25;
+use crate::{serial_print, serial_println};
+#[cfg(test)]
+use vga::writers::Screen;
 
 #[test_case]
 fn test_println_simple(sp: &mut crate::serial::SerialPort) {
-    let mut writer = VgaWriter::new(Text80x25::new());
+    let mut writer = Writer::new(Text80x25::new());
 
     serial_print!(sp, "test_println... ");
     println!(&mut writer, "test_println_simple output");
@@ -220,7 +225,7 @@ fn test_println_simple(sp: &mut crate::serial::SerialPort) {
 
 #[test_case]
 fn test_println_many(sp: &mut crate::serial::SerialPort) {
-    let mut writer = VgaWriter::new(Text80x25::new());
+    let mut writer = Writer::new(Text80x25::new());
 
     serial_print!(sp, "test_println_many... ");
     for _ in 0..200 {
@@ -231,7 +236,7 @@ fn test_println_many(sp: &mut crate::serial::SerialPort) {
 
 #[test_case]
 fn test_println_output(sp: &mut crate::serial::SerialPort) {
-    let mut writer = VgaWriter::new(Text80x25::new());
+    let mut writer = Writer::new(Text80x25::new());
 
     serial_print!(sp, "test_println_output... ");
 
@@ -249,7 +254,7 @@ fn test_println_output(sp: &mut crate::serial::SerialPort) {
 
 #[test_case]
 fn test_println_fit_line_output(sp: &mut crate::serial::SerialPort) {
-    let mut writer = VgaWriter::new(Text80x25::new());
+    let mut writer = Writer::new(Text80x25::new());
 
     serial_print!(sp, "test_println_fit_line_output... ");
 
@@ -271,7 +276,7 @@ fn test_println_fit_line_output(sp: &mut crate::serial::SerialPort) {
 
 #[test_case]
 fn test_clear_screen(sp: &mut crate::serial::SerialPort) {
-    let writer = VgaWriter::new(Text80x25::new());
+    let writer = Writer::new(Text80x25::new());
 
     serial_print!(sp, "test_clear_screen... ");
 

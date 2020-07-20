@@ -12,15 +12,15 @@ struct ListNode {
     next: Option<&'static mut ListNode>,
 }
 
-pub struct FixedSizeBlockAllocator {
+pub struct Allocator {
     list_heads: [Option<&'static mut ListNode>; BLOCK_SIZES.len()],
     fallback_allocator: linked_list_allocator::Heap,
 }
 
-impl FixedSizeBlockAllocator {
+impl Allocator {
     /// Creates an empty `FixedSizeBlockAllocator`.
     pub const fn new() -> Self {
-        FixedSizeBlockAllocator {
+        Allocator {
             list_heads: [None; BLOCK_SIZES.len()],
             fallback_allocator: linked_list_allocator::Heap::empty(),
         }
@@ -53,49 +53,42 @@ fn list_index(layout: &Layout) -> Option<usize> {
     BLOCK_SIZES.iter().position(|&s| s >= required_block_size)
 }
 
-unsafe impl GlobalAlloc for Locked<FixedSizeBlockAllocator> {
+unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let mut allocator = self.lock();
-        match list_index(&layout) {
-            Some(index) => {
-                match allocator.list_heads[index].take() {
-                    Some(node) => {
-                        allocator.list_heads[index] = node.next.take();
-                        node as *mut ListNode as *mut u8
-                    }
-                    None => {
-                        // No block exists in list => allocate new block
-                        let block_size = BLOCK_SIZES[index];
-                        // Only works if all block sizes are a power of 2
-                        let block_align = block_size;
-                        let layout = Layout::from_size_align(block_size, block_align).unwrap();
-                        allocator.fallback_alloc(layout)
-                    }
-                }
+        if let Some(index) = list_index(&layout) {
+            if let Some(node) = allocator.list_heads[index].take() {
+                allocator.list_heads[index] = node.next.take();
+                node as *mut ListNode as *mut u8
+            } else {
+                // No block exists in list => allocate new block
+                let block_size = BLOCK_SIZES[index];
+                // Only works if all block sizes are a power of 2
+                let block_align = block_size;
+                let layout = Layout::from_size_align(block_size, block_align).unwrap();
+                allocator.fallback_alloc(layout)
             }
-            None => allocator.fallback_alloc(layout),
+        } else {
+            allocator.fallback_alloc(layout)
         }
     }
 
-    #[allow(clippy::cast_ptr_alignment)]
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         let mut allocator = self.lock();
-        match list_index(&layout) {
-            Some(index) => {
-                let new_node = ListNode {
-                    next: allocator.list_heads[index].take(),
-                };
-                // Verify that block has size and alignment required for storing node
-                assert!(mem::size_of::<ListNode>() <= BLOCK_SIZES[index]);
-                assert!(mem::align_of::<ListNode>() <= BLOCK_SIZES[index]);
-                let new_node_ptr = ptr as *mut ListNode;
-                new_node_ptr.write(new_node);
-                allocator.list_heads[index] = Some(&mut *new_node_ptr);
-            }
-            None => {
-                let ptr = NonNull::new(ptr).unwrap();
-                allocator.fallback_allocator.deallocate(ptr, layout);
-            }
+        if let Some(index) = list_index(&layout) {
+            let new_node = ListNode {
+                next: allocator.list_heads[index].take(),
+            };
+            // Verify that block has size and alignment required for storing node
+            assert!(mem::size_of::<ListNode>() <= BLOCK_SIZES[index]);
+            assert!(mem::align_of::<ListNode>() <= BLOCK_SIZES[index]);
+            #[allow(clippy::cast_ptr_alignment)]
+            let new_node_ptr = ptr as *mut ListNode;
+            new_node_ptr.write(new_node);
+            allocator.list_heads[index] = Some(&mut *new_node_ptr);
+        } else {
+            let ptr = NonNull::new(ptr).unwrap();
+            allocator.fallback_allocator.deallocate(ptr, layout);
         }
     }
 }

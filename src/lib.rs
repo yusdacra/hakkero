@@ -10,7 +10,8 @@
 #![feature(trait_alias)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
-#![allow(clippy::new_without_default)]
+#![deny(clippy::all, clippy::pedantic)]
+#![allow(clippy::new_without_default, clippy::must_use_candidate)]
 
 extern crate alloc;
 
@@ -97,8 +98,9 @@ entry_point!(test_kernel_main);
 
 /// Entry point for `cargo xtest`
 #[cfg(test)]
-fn test_kernel_main(_boot_info: &'static BootInfo) -> ! {
+fn test_kernel_main(boot_info: &'static BootInfo) -> ! {
     init();
+    init_heap(boot_info);
     test_main();
     hlt_loop();
 }

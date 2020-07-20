@@ -2,17 +2,17 @@ use super::{align_up, Locked};
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr;
 
-pub struct BumpAllocator {
+pub struct Allocator {
     heap_start: usize,
     heap_end: usize,
     next: usize,
     allocations: usize,
 }
 
-impl BumpAllocator {
+impl Allocator {
     /// Creates a new empty bump allocator.
     pub const fn new() -> Self {
-        BumpAllocator {
+        Allocator {
             heap_start: 0,
             heap_end: 0,
             next: 0,
@@ -33,7 +33,7 @@ impl BumpAllocator {
 }
 
 // TODO: Implement downwards instead of upwards
-unsafe impl GlobalAlloc for Locked<BumpAllocator> {
+unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let mut bump = self.lock();
 

@@ -1,6 +1,5 @@
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
-use fixed_size_block::FixedSizeBlockAllocator;
 use x86_64::{
     structures::paging::{
         mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
@@ -15,17 +14,21 @@ pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 1000 * 1024; // 1000 KiB
 
 #[global_allocator]
-static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
+static ALLOCATOR: Locked<fixed_size_block::Allocator> =
+    Locked::new(fixed_size_block::Allocator::new());
 
 /// This is where the heap is actually initialized.
 /// Calculates the page range, allocates the frames, and then maps the pages to the allocated frames. Lastly, calls the static `ALLOCATOR`'s `init` function.
+///
+/// # Errors
+/// Can error when a frame allocation or mapping fails.
 pub fn setup_heap(
     mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
 ) -> Result<(), MapToError<Size4KiB>> {
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START as u64);
-        let heap_end = heap_start + HEAP_SIZE - 1u64;
+        let heap_end = heap_start + HEAP_SIZE - 1_u64;
         let heap_start_page = Page::containing_address(heap_start);
         let heap_end_page = Page::containing_address(heap_end);
         Page::range_inclusive(heap_start_page, heap_end_page)

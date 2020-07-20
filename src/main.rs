@@ -13,21 +13,21 @@ use hakkero::task::{
     executor::{spawn_task, Executor},
     keyboard, Task,
 };
-use hakkero::vga::{VgaWriter, VgaLogger};
+use hakkero::vga::{Logger, Readline, Writer};
 use spin::{Mutex, Once};
 use vga::writers::Text80x25;
 
 lazy_static::lazy_static! {
-    static ref WRITER: Mutex<VgaWriter<Text80x25>> = Mutex::new(VgaWriter::new(Text80x25::new()));
+    static ref WRITER: Mutex<Writer<Text80x25>> = Mutex::new(Writer::default());
 }
 
 // NOTE: lazy_static doesn't work with set_logger for some reason (weird "`Log` not implemented for `LOGGER`" error) so we use `Once`
-static LOGGER: Once<VgaLogger<Text80x25>> = Once::new();
+static LOGGER: Once<Logger<Text80x25>> = Once::new();
 
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Set up logger
-    LOGGER.call_once(|| VgaLogger::new(&WRITER));
+    LOGGER.call_once(|| Logger::new(&WRITER));
 
     // TODO: Look into using `set_logger_boxed` (fork `log` and use `alloc` instead of `std` in feature? (maybe even make a PR for that?))
     log::set_logger(LOGGER.r#try().unwrap()).expect("Could not setup logger.");
@@ -43,7 +43,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     some_info();
     tutorial_test_things();
-
 
     let mut executor = Executor::new();
     executor.spawn(Task::new(start_handlers()));
@@ -65,14 +64,18 @@ async fn start_handlers() {
 
 async fn handle_decoded_keys() {
     use futures_util::stream::StreamExt;
+
     let mut queue = hakkero::task::keyboard::DecodedKeyStream;
+    let mut rl = Readline::default();
 
     while let Some(key) = queue.next().await {
-        match key {
-            pc_keyboard::DecodedKey::Unicode(character) => {
-                hakkero::print!(&mut WRITER.lock(), "{}", character)
-            }
-            pc_keyboard::DecodedKey::RawKey(_) => (),
+        if let Some(s) = rl.handle_key(key) {
+            log::trace!(
+                "rl output: {}\n",
+                s.into_iter()
+                    .map(|b| b as char)
+                    .collect::<alloc::string::String>()
+            );
         }
     }
 }

@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use core::sync::atomic::{AtomicU64, Ordering};
 use core::task::{Context, Poll};
-use core::{future::Future, pin::Pin};
+use core::{future, pin::Pin};
 
 pub mod executor;
 pub mod keyboard;
@@ -12,7 +12,7 @@ pub mod simple_executor;
 struct TaskId(u64);
 
 /// Trait alias for convenience.
-pub trait TaskFuture = Future<Output = ()> + Send + Sync;
+pub trait Future = future::Future<Output = ()> + Send + Sync;
 
 impl TaskId {
     fn new() -> Self {
@@ -23,11 +23,11 @@ impl TaskId {
 
 pub struct Task {
     id: TaskId,
-    future: Pin<Box<dyn TaskFuture>>,
+    future: Pin<Box<dyn Future>>,
 }
 
 impl Task {
-    pub fn new(future: impl TaskFuture + 'static) -> Task {
+    pub fn new(future: impl Future + 'static) -> Task {
         Task {
             id: TaskId::new(),
             future: Box::pin(future),

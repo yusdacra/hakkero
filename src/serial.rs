@@ -42,11 +42,11 @@ macro_rules! serial_println {
 
 use log::{Log, Metadata, Record};
 
-pub struct SerialLogger {
+pub struct Logger {
     base: u16,
 }
 
-impl SerialLogger {
+impl Logger {
     /// Creates a new `SerialLogger`
     ///
     /// # Safety
@@ -61,7 +61,7 @@ impl SerialLogger {
     }
 }
 
-impl Log for SerialLogger {
+impl Log for Logger {
     fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }
