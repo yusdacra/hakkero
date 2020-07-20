@@ -113,22 +113,21 @@ impl<T: Writer> core::fmt::Write for VgaWriter<T> {
     }
 }
 
-use alloc::sync::Arc;
 use log::{Log, Metadata, Record};
 use spin::Mutex;
 
 // TODO: Remove the `Arc` (so, don't allocate) so that we can use it before allocator initialization.
-pub struct VgaLogger<T: Writer> {
-    ivw: Arc<Mutex<VgaWriter<T>>>,
+pub struct VgaLogger<T: 'static + Writer> {
+    ivw: &'static Mutex<VgaWriter<T>>,
 }
 
-impl<T: Writer> VgaLogger<T> {
-    pub fn new(ivw: Arc<Mutex<VgaWriter<T>>>) -> Self {
+impl<T: 'static + Writer> VgaLogger<T> {
+    pub fn new(ivw: &'static Mutex<VgaWriter<T>>) -> Self {
         Self { ivw }
     }
 }
 
-impl<T: Writer> Log for VgaLogger<T> {
+impl<T: 'static + Writer> Log for VgaLogger<T> {
     fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }

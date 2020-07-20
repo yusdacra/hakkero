@@ -8,29 +8,29 @@
 use bootloader::{entry_point, BootInfo};
 extern crate alloc;
 
-use alloc::sync::Arc;
 use core::panic::PanicInfo;
-use hakkero::serial::SerialLogger;
 use hakkero::task::{
     executor::{spawn_task, Executor},
     keyboard, Task,
 };
-use hakkero::vga::VgaWriter;
-use spin::Mutex;
+use hakkero::vga::{VgaWriter, VgaLogger};
+use spin::{Mutex, Once};
 use vga::writers::Text80x25;
 
 lazy_static::lazy_static! {
-    static ref WRITER: Arc<Mutex<VgaWriter<Text80x25>>> = Arc::new(Mutex::new(VgaWriter::new(Text80x25::new())));
+    static ref WRITER: Mutex<VgaWriter<Text80x25>> = Mutex::new(VgaWriter::new(Text80x25::new()));
 }
 
 // NOTE: lazy_static doesn't work with set_logger for some reason (weird "`Log` not implemented for `LOGGER`" error) so we use `Once`
-static LOGGER: SerialLogger = SerialLogger::new_qemu();
+static LOGGER: Once<VgaLogger<Text80x25>> = Once::new();
 
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Set up logger
+    LOGGER.call_once(|| VgaLogger::new(&WRITER));
+
     // TODO: Look into using `set_logger_boxed` (fork `log` and use `alloc` instead of `std` in feature? (maybe even make a PR for that?))
-    log::set_logger(&LOGGER).expect("Could not setup logger.");
+    log::set_logger(LOGGER.r#try().unwrap()).expect("Could not setup logger.");
     log::set_max_level(log::LevelFilter::Trace);
 
     // Initialize phase
