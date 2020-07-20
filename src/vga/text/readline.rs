@@ -149,6 +149,17 @@ fn test_one_key_unicode(sp: &mut crate::serial::SerialPort) {
 }
 
 #[test_case]
+fn test_one_key_unicode_full_buf(sp: &mut crate::serial::SerialPort) {
+    serial_print!(sp, "test_one_key_unicode_full_buf... ");
+    let mut rl = Readline::default();
+    rl.buf = vec![b'a'; 80];
+    rl.pos = 80;
+    rl.handle_key(DecodedKey::Unicode('b'));
+    assert_eq!(*rl.buf.last().unwrap(), b'a');
+    serial_println!(sp, "[ok]");
+}
+
+#[test_case]
 fn test_left_empty_buf(sp: &mut crate::serial::SerialPort) {
     serial_print!(sp, "test_left_empty_buf... ");
     let mut rl = Readline::default();
@@ -202,6 +213,17 @@ fn test_right(sp: &mut crate::serial::SerialPort) {
     rl.buf = vec![b'a'];
     rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowRight));
     assert_eq!(rl.pos, 1);
+    serial_println!(sp, "[ok]");
+}
+
+#[test_case]
+fn test_right_full_buf(sp: &mut crate::serial::SerialPort) {
+    serial_print!(sp, "test_right_full_buf... ");
+    let mut rl = Readline::default();
+    rl.buf = vec![b'a'; 80];
+    rl.pos = 80;
+    rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowRight));
+    assert_eq!(rl.pos, 80);
     serial_println!(sp, "[ok]");
 }
 
