@@ -139,7 +139,7 @@ impl<T: 'static + Writer> Log for VgaLogger<T> {
             let color = match record.level() {
                 Level::Error => VgaWriterColor::new(Color16::Black, Color16::Red),
                 Level::Warn => VgaWriterColor::new(Color16::Yellow, Color16::Black),
-                Level::Info => VgaWriterColor::new(Color16::Blue, Color16::Black),
+                Level::Info => VgaWriterColor::new(Color16::LightBlue, Color16::Black),
                 _ => VgaWriterColor::new(Color16::White, Color16::Black),
             };
             crate::println_colored!(

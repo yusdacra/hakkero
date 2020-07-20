@@ -44,18 +44,10 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     some_info();
     tutorial_test_things();
 
-    {
-        use hakkero::vga::VgaWriterColor;
-        use vga::colors::Color16;
-        hakkero::println_colored!(
-            &mut WRITER.lock(),
-            VgaWriterColor::new(Color16::Red, Color16::Black),
-            "Welcome to Hakkero OS!\n"
-        );
-    }
 
     let mut executor = Executor::new();
     executor.spawn(Task::new(start_handlers()));
+    log::info!("Welcome to Hakkero OS!\n");
     executor.run();
 }
 
