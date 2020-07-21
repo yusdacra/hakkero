@@ -3,17 +3,16 @@
 #![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
-use hakkero::{exit_qemu, serial_print, serial_println, QemuExitCode};
+use hakkero::{arch::x86_64::gdt, exit_qemu, serial_print, serial_println, QemuExitCode};
 use lazy_static::lazy_static;
 use x86_64::structures::idt::InterruptDescriptorTable;
 use x86_64::structures::idt::InterruptStackFrame;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    let mut sp = hakkero::serial::create_qemu_sp();
-    serial_print!(&mut sp, "stack_overflow...");
+    serial_print!("stack_overflow... ");
 
-    hakkero::gdt::init();
+    gdt::init();
     init_test_idt();
 
     stack_overflow();
@@ -39,7 +38,7 @@ lazy_static! {
         unsafe {
             idt.double_fault
                 .set_handler_fn(test_double_fault_handler)
-                .set_stack_index(hakkero::gdt::DOUBLE_FAULT_IST_INDEX);
+                .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
         }
 
         idt
@@ -54,8 +53,7 @@ extern "x86-interrupt" fn test_double_fault_handler(
     _stack_frame: &mut InterruptStackFrame,
     _error_code: u64,
 ) -> ! {
-    let mut sp = hakkero::serial::create_qemu_sp();
-    serial_println!(&mut sp, "[ok]");
+    serial_println!("[ok]");
     exit_qemu(QemuExitCode::Success);
     loop {}
 }

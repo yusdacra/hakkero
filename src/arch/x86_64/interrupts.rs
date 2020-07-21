@@ -1,17 +1,10 @@
-use crate::{gdt, hlt_loop};
-use lazy_static::lazy_static;
-use pic8259_simple::ChainedPics;
+use super::{
+    device::pic8259::{send_eoi, PIC_1_OFFSET},
+    gdt, hlt_loop,
+};
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
-#[cfg(test)]
-use crate::{serial_print, serial_println};
-
-pub const PIC_1_OFFSET: u8 = 32;
-pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
-pub static PICS: spin::Mutex<ChainedPics> =
-    spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
-
-lazy_static! {
+lazy_static::lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
@@ -27,7 +20,9 @@ lazy_static! {
     };
 }
 
-/// Hardware Interrupts (PIC Intel 8259)
+pub fn init_idt() {
+    IDT.load();
+}
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -37,18 +32,13 @@ pub enum InterruptIndex {
 }
 
 impl InterruptIndex {
-    fn as_u8(self) -> u8 {
+    pub fn as_u8(self) -> u8 {
         self as u8
     }
 
-    fn as_usize(self) -> usize {
+    pub fn as_usize(self) -> usize {
         usize::from(self.as_u8())
     }
-}
-
-pub fn init_pic() {
-    unsafe { PICS.lock().initialize() };
-    x86_64::instructions::interrupts::enable();
 }
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: &mut InterruptStackFrame) {
@@ -61,19 +51,6 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: &mut Interrup
     crate::task::keyboard::add_scancode(scancode);
 
     send_eoi(InterruptIndex::Keyboard);
-}
-
-/// Convenience function to notify the end of an interrupt.
-fn send_eoi(int_index: InterruptIndex) {
-    unsafe {
-        PICS.lock().notify_end_of_interrupt(int_index.as_u8());
-    }
-}
-
-/// Expection Interrupts
-
-pub fn init_idt() {
-    IDT.load();
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut InterruptStackFrame) {
@@ -103,12 +80,15 @@ extern "x86-interrupt" fn page_fault_handler(
     hlt_loop()
 }
 
-/// Tests
+// TESTS
+
+#[cfg(test)]
+use crate::{serial_print, serial_println};
 
 #[test_case]
-fn test_breakpoint_exception(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_breakpoint_exception... ");
+fn test_breakpoint_exception() {
+    serial_print!("test_breakpoint_exception... ");
     // invoke a breakpoint exception
     x86_64::instructions::interrupts::int3();
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }

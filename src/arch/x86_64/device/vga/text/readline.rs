@@ -1,13 +1,14 @@
-use super::WriterColor;
-use alloc::vec::Vec;
+use alloc::string::String;
 use pc_keyboard::DecodedKey;
-use vga::colors::Color16;
-use vga::writers::{Screen, ScreenCharacter, Text80x25, TextWriter};
+use vga::{
+    colors::{Color16, TextModeColor},
+    writers::{Screen, ScreenCharacter, Text80x25, TextWriter},
+};
 
 pub struct Readline<T: TextWriter> {
     bg_color: Color16,
     fg_color: Color16,
-    buf: Vec<u8>,
+    buf: String,
     pos: usize,
     min_pos: usize,
     max_pos: usize,
@@ -31,7 +32,7 @@ impl<T: TextWriter> Readline<T> {
         Self {
             bg_color,
             fg_color,
-            buf: Vec::with_capacity(max_pos - min_pos),
+            buf: String::with_capacity(max_pos - min_pos),
             pos: 0,
             min_pos,
             max_pos,
@@ -40,27 +41,31 @@ impl<T: TextWriter> Readline<T> {
         }
     }
 
-    pub fn handle_key(&mut self, key: DecodedKey) -> Option<Vec<u8>> {
-        let mut res = None;
+    /// Takes a `DecodedKey`. Returns the content of inner buffer when `'\n'` is pressed.
+    pub fn handle_key(&mut self, key: DecodedKey) -> Option<String> {
         match key {
             DecodedKey::Unicode(character) => {
                 let ch = character as u8;
                 if ch >= 0x20 && ch <= 0x7e {
-                    if self.pos < self.max_pos {
-                        self.buf.push(ch);
-                        self.offset_pos(1);
-                    }
+                    self.buf.insert(self.pos, ch as char);
+                    self.offset_pos(1);
                 } else if ch == 8 {
                     if self.pos > self.min_pos {
                         self.buf.remove(self.pos - 1);
                         self.offset_pos(-1);
                     }
                 } else if ch == b'\n' {
-                    res = Some(Vec::with_capacity(self.buf.capacity()));
-                    res.as_mut().unwrap().append(&mut self.buf);
+                    let mut res = String::with_capacity(self.buf.capacity());
+                    for c in self.buf.drain(..) {
+                        res.push(c);
+                    }
+                    self.buf.shrink_to(0);
                     self.pos = self.min_pos;
+                    self.write_buf();
+                    self.iw.set_cursor_position(self.pos, self.line);
+                    return Some(res);
                 } else {
-                    self.buf.push(0xfe);
+                    self.buf.push(0xfe as char);
                     self.offset_pos(1);
                 }
                 self.write_buf();
@@ -85,20 +90,28 @@ impl<T: TextWriter> Readline<T> {
             }
         }
         self.iw.set_cursor_position(self.pos, self.line);
-        res
+        None
     }
 
     fn write_buf(&self) {
+        let mut bytes = self.buf.bytes();
         for x in self.min_pos..self.max_pos {
-            let character = if let Some(ch) = self.buf.get(x - self.min_pos) {
-                *ch
+            let character = if let Some(ch) = bytes.next() {
+                ch
             } else {
                 b' '
             };
             self.iw.write_character(
                 x,
                 self.line,
-                ScreenCharacter::new(character, WriterColor::new(self.fg_color, self.bg_color)),
+                ScreenCharacter::new(character, TextModeColor::new(self.fg_color, self.bg_color)),
+            );
+        }
+        if self.buf.len() > self.max_pos {
+            self.iw.write_character(
+                self.max_pos - 1,
+                self.line,
+                ScreenCharacter::new(b'>', TextModeColor::new(self.bg_color, self.fg_color)),
             );
         }
     }
@@ -106,11 +119,8 @@ impl<T: TextWriter> Readline<T> {
     fn offset_pos(&mut self, by: isize) {
         let mut new_pos = self.pos as isize + by;
         let min_pos = self.min_pos as isize;
-        let max_pos = self.max_pos as isize;
         let buf_len = self.buf.len() as isize;
-        if new_pos > max_pos {
-            new_pos = max_pos;
-        } else if new_pos > buf_len {
+        if new_pos > buf_len {
             new_pos = buf_len;
         } else if new_pos < min_pos {
             new_pos = min_pos;
@@ -135,155 +145,158 @@ impl Default for Readline<Text80x25> {
 // TESTS
 
 #[cfg(test)]
-use crate::{serial_print, serial_println};
-#[cfg(test)]
-use alloc::vec;
+use {
+    crate::{serial_print, serial_println},
+    alloc::vec,
+};
 
 #[test_case]
-fn test_one_key_unicode(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_one_key_unicode... ");
+fn test_one_key_unicode() {
+    serial_print!("test_one_key_unicode... ");
     let mut rl = Readline::default();
     rl.handle_key(DecodedKey::Unicode('a'));
-    assert_eq!(*rl.buf.first().unwrap(), b'a');
-    serial_println!(sp, "[ok]");
+    assert_eq!(&rl.buf, "a");
+    assert_eq!(rl.pos, 1);
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_one_key_unicode_full_buf(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_one_key_unicode_full_buf... ");
+fn test_one_key_insert_unicode() {
+    serial_print!("test_one_key_insert_unicode... ");
     let mut rl = Readline::default();
-    rl.buf = vec![b'a'; 80];
-    rl.pos = 80;
+    rl.buf = String::from("aa");
+    rl.pos = 1;
     rl.handle_key(DecodedKey::Unicode('b'));
-    assert_eq!(*rl.buf.last().unwrap(), b'a');
-    serial_println!(sp, "[ok]");
+    assert_eq!(rl.pos, 2);
+    assert_eq!(&rl.buf, "aba");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_left_empty_buf(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_left_empty_buf... ");
+fn test_left_empty_buf() {
+    serial_print!("test_left_empty_buf... ");
     let mut rl = Readline::default();
     rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowLeft));
     assert_eq!(rl.pos, 0);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_right_empty_buf(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_right_empty_buf... ");
+fn test_right_empty_buf() {
+    serial_print!("test_right_empty_buf... ");
     let mut rl = Readline::default();
     rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowRight));
     assert_eq!(rl.pos, 0);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_up_empty_buf(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_up_empty_buf... ");
+fn test_up_empty_buf() {
+    serial_print!("test_up_empty_buf... ");
     let mut rl = Readline::default();
     rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowUp));
     assert_eq!(rl.pos, 0);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_down_empty_buf(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_down_empty_buf... ");
+fn test_down_empty_buf() {
+    serial_print!("test_down_empty_buf... ");
     let mut rl = Readline::default();
     rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowDown));
     assert_eq!(rl.pos, 0);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_left(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_left... ");
+fn test_left() {
+    serial_print!("test_left... ");
     let mut rl = Readline::default();
-    rl.buf = vec![b'a'];
+    rl.buf = String::from("a");
     rl.pos = 1;
     rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowLeft));
     assert_eq!(rl.pos, 0);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_right(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_right... ");
+fn test_right() {
+    serial_print!("test_right... ");
     let mut rl = Readline::default();
-    rl.buf = vec![b'a'];
+    rl.buf = String::from("a");
     rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowRight));
     assert_eq!(rl.pos, 1);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_right_full_buf(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_right_full_buf... ");
+fn test_right_full_buf() {
+    serial_print!("test_right_full_buf... ");
     let mut rl = Readline::default();
-    rl.buf = vec![b'a'; 80];
+    rl.buf = vec![b'a'; 80].into_iter().map(|b| b as char).collect();
     rl.pos = 80;
     rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowRight));
     assert_eq!(rl.pos, 80);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_up(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_up... ");
+fn test_up() {
+    serial_print!("test_up... ");
     let mut rl = Readline::default();
-    rl.buf = vec![b'a'];
+    rl.buf = String::from("a");
     rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowUp));
     assert_eq!(rl.pos, 1);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_down(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_down_empty_buf... ");
+fn test_down() {
+    serial_print!("test_down_empty_buf... ");
     let mut rl = Readline::default();
-    rl.buf = vec![b'a'];
+    rl.buf = String::from("a");
     rl.pos = 1;
     rl.handle_key(DecodedKey::RawKey(pc_keyboard::KeyCode::ArrowDown));
     assert_eq!(rl.pos, 0);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_newline(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_newline... ");
+fn test_newline() {
+    serial_print!("test_newline... ");
     let mut rl = Readline::default();
-    rl.buf = vec![b'a'];
+    rl.buf = String::from("a");
     let res = rl.handle_key(DecodedKey::Unicode('\n')).unwrap();
-    assert_eq!(*res.first().unwrap(), b'a');
-    serial_println!(sp, "[ok]");
+    assert_eq!(&res, "a");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_newline_empty_buf(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_newline_empty_buf... ");
+fn test_newline_empty_buf() {
+    serial_print!("test_newline_empty_buf... ");
     let mut rl = Readline::default();
     let res = rl.handle_key(DecodedKey::Unicode('\n')).unwrap();
     assert!(res.is_empty());
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_backspace(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_backspace... ");
+fn test_backspace() {
+    serial_print!("test_backspace... ");
     let mut rl = Readline::default();
-    rl.buf = vec![b'a'];
+    rl.buf = String::from("a");
     rl.pos = 1;
     rl.handle_key(DecodedKey::Unicode('\u{8}'));
     assert!(rl.buf.is_empty());
     assert_eq!(rl.pos, 0);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }
 
 #[test_case]
-fn test_backspace_empty_buf(sp: &mut crate::serial::SerialPort) {
-    serial_print!(sp, "test_backspace_empty_buf... ");
+fn test_backspace_empty_buf() {
+    serial_print!("test_backspace_empty_buf... ");
     let mut rl = Readline::default();
     rl.handle_key(DecodedKey::Unicode('\u{8}'));
     assert_eq!(rl.pos, 0);
-    serial_println!(sp, "[ok]");
+    serial_println!("[ok]");
 }

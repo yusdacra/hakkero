@@ -20,7 +20,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 #[test_case]
-fn test_println(sp: &mut hakkero::serial::SerialPort) {
-    serial_print!(sp, "test_println... ");
-    serial_println!(sp, "[ok]");
+fn test_boot() {
+    serial_print!("test_boot... ");
+    serial_println!("[ok]");
 }

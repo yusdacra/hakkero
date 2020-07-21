@@ -1,13 +1,48 @@
-use bootloader::bootinfo::MemoryMap;
-use bootloader::bootinfo::MemoryRegionType;
+use crate::allocator::{HEAP_SIZE, HEAP_START};
+use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use x86_64::{
-    structures::paging::{FrameAllocator, Mapper, Page, PhysFrame, Size4KiB},
-    PhysAddr,
+    structures::paging::{
+        mapper::MapToError, FrameAllocator, Mapper, OffsetPageTable, Page, PageTable,
+        PageTableFlags, PhysFrame, Size4KiB,
+    },
+    PhysAddr, VirtAddr,
 };
-use x86_64::{
-    structures::paging::{OffsetPageTable, PageTable},
-    VirtAddr,
-};
+
+/// This is where the heap is actually initialized.
+/// Calculates the page range, allocates the frames, and then maps the pages to the allocated frames. Lastly, calls the static `ALLOCATOR`'s `init` function.
+///
+/// # Errors
+/// Can error when a frame allocation or mapping fails.
+pub fn setup_heap(
+    mapper: &mut impl Mapper<Size4KiB>,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+) -> Result<(), MapToError<Size4KiB>> {
+    let page_range = {
+        let heap_start = VirtAddr::new(HEAP_START as u64);
+        let heap_end = heap_start + HEAP_SIZE - 1_u64;
+        let heap_start_page = Page::containing_address(heap_start);
+        let heap_end_page = Page::containing_address(heap_end);
+        Page::range_inclusive(heap_start_page, heap_end_page)
+    };
+
+    for page in page_range {
+        let frame = frame_allocator
+            .allocate_frame()
+            .ok_or(MapToError::FrameAllocationFailed)?;
+        let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+        unsafe {
+            mapper.map_to(page, frame, flags, frame_allocator)?.flush();
+        };
+    }
+
+    unsafe {
+        crate::allocator::ALLOCATOR
+            .lock()
+            .init(HEAP_START, HEAP_SIZE);
+    }
+
+    Ok(())
+}
 
 /// A `FrameAllocator` that always returns `None`.
 pub struct EmptyFrameAllocator;
