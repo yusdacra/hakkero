@@ -45,13 +45,13 @@ impl Log for Logger {
             #[cfg(feature = "log_vga")]
             {
                 use log::Level;
-                use vga::colors::{Color16, TextModeColor};
+                use vga::colors::Color16;
 
                 let color = match record.level() {
-                    Level::Error => TextModeColor::new(Color16::Black, Color16::Red),
-                    Level::Warn => TextModeColor::new(Color16::Yellow, Color16::Black),
-                    Level::Info => TextModeColor::new(Color16::LightBlue, Color16::Black),
-                    _ => TextModeColor::new(Color16::White, Color16::Black),
+                    Level::Error => (Color16::Black, Color16::Red),
+                    Level::Warn => (Color16::Yellow, Color16::Black),
+                    Level::Info => (Color16::LightBlue, Color16::Black),
+                    _ => (Color16::White, Color16::Black),
                 };
                 crate::println_colored!(color, "[{:5}] {}", record.level(), record.args());
             }
