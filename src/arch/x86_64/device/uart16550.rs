@@ -1,6 +1,5 @@
 use crate::arch::x86_64::woint;
-use lazy_static::lazy_static;
-use spin::Mutex;
+use spinning_top::Spinlock;
 use uart_16550::SerialPort;
 
 pub fn init() {
@@ -9,9 +8,7 @@ pub fn init() {
 
 pub const COM1_ADDR: u16 = 0x03F8;
 
-lazy_static! {
-    static ref COM1: Mutex<SerialPort> = Mutex::new(unsafe { SerialPort::new(COM1_ADDR) });
-}
+static COM1: Spinlock<SerialPort> = Spinlock::new(unsafe { SerialPort::new(COM1_ADDR) });
 
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {

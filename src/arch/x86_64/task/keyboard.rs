@@ -1,3 +1,4 @@
+use crate::common::Once;
 use core::{
     pin::Pin,
     task::{Context, Poll},
@@ -6,7 +7,6 @@ use crossbeam_queue::ArrayQueue;
 use futures_util::stream::{Stream, StreamExt};
 use futures_util::task::AtomicWaker;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-use spin::Once;
 
 const SC_CAP: usize = 100;
 /// Holds scancodes added by `add_scancode`.
@@ -22,7 +22,7 @@ fn clear_array_queue<T>(queue: &ArrayQueue<T>) {
 
 /// Handles scancodes asynchronously.
 pub async fn handle_scancodes() {
-    DECODED_KEYS.call_once(|| ArrayQueue::new(SC_CAP));
+    DECODED_KEYS.try_init(ArrayQueue::new(SC_CAP));
 
     let mut scancodes = ScancodeStream::new();
     let mut keyboard = Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore);
@@ -30,14 +30,7 @@ pub async fn handle_scancodes() {
     while let Some(scancode) = scancodes.next().await {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
-                if let Some(d) = DECODED_KEYS.r#try() {
-                    if d.push(key).is_err() {
-                        log::warn!("decoded key queue full");
-                    }
-                    DECODED_KEYS_WAKER.wake();
-                } else {
-                    log::warn!("decoded key queue uninitialized");
-                }
+                add_decoded_key(key);
             }
         }
     }
@@ -46,10 +39,10 @@ pub async fn handle_scancodes() {
 /// Called by the keyboard interrupt handler.
 ///
 /// Must not block or allocate.
-pub(crate) fn add_scancode(scancode: u8) {
+pub fn add_scancode(scancode: u8) {
     use log::warn;
 
-    if let Some(queue) = SCANCODES.r#try() {
+    if let Some(queue) = SCANCODES.get() {
         if queue.push(scancode).is_err() {
             warn!("scancode queue full, clearing queue to avoid dropping keyboard input");
             clear_array_queue(&queue);
@@ -61,6 +54,22 @@ pub(crate) fn add_scancode(scancode: u8) {
     }
 }
 
+/// Called by the scancode handler function.
+///
+/// Must not block or allocate.
+fn add_decoded_key(key: DecodedKey) {
+    use log::warn;
+    if let Some(d) = DECODED_KEYS.get() {
+        if d.push(key).is_err() {
+            warn!("decoded key queue full");
+        } else {
+            DECODED_KEYS_WAKER.wake();
+        }
+    } else {
+        warn!("decoded key queue uninitialized");
+    }
+}
+
 /// Polls scancodes from `SCANCODE_QUEUE`.
 pub struct ScancodeStream {
     _private: (),
@@ -68,7 +77,7 @@ pub struct ScancodeStream {
 
 impl ScancodeStream {
     pub fn new() -> Self {
-        SCANCODES.call_once(|| ArrayQueue::new(SC_CAP));
+        SCANCODES.try_init(ArrayQueue::new(SC_CAP));
         ScancodeStream { _private: () }
     }
 }
@@ -77,7 +86,7 @@ impl Stream for ScancodeStream {
     type Item = u8;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        let queue = SCANCODES.r#try().expect("not initialized");
+        let queue = SCANCODES.get().expect("not initialized");
 
         if let Ok(scancode) = queue.pop() {
             return Poll::Ready(Some(scancode));
@@ -101,7 +110,11 @@ impl Stream for DecodedKeyStream {
     type Item = DecodedKey;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        let queue = DECODED_KEYS.r#try().expect("not initialized");
+        let queue = if let Some(q) = DECODED_KEYS.get() {
+            q
+        } else {
+            return Poll::Pending;
+        };
 
         if let Ok(key) = queue.pop() {
             return Poll::Ready(Some(key));

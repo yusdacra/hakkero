@@ -2,7 +2,10 @@
 #![no_main]
 
 use core::panic::PanicInfo;
-use hakkero::{exit_qemu, serial_print, serial_println, QemuExitCode};
+use hakkero::{
+    serial_print, serial_println,
+    test::{exit_qemu, QemuExitCode},
+};
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {

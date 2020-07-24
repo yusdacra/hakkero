@@ -1,5 +1,6 @@
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
+use spinning_top::{Spinlock, SpinlockGuard};
 
 pub mod bump;
 pub mod fixed_size_block;
@@ -30,17 +31,17 @@ unsafe impl GlobalAlloc for Dummy {
 }
 
 pub struct Locked<A> {
-    inner: spin::Mutex<A>,
+    inner: Spinlock<A>,
 }
 
 impl<A> Locked<A> {
     pub const fn new(inner: A) -> Self {
         Locked {
-            inner: spin::Mutex::new(inner),
+            inner: Spinlock::new(inner),
         }
     }
 
-    pub fn lock(&self) -> spin::MutexGuard<A> {
+    pub fn lock(&self) -> SpinlockGuard<A> {
         self.inner.lock()
     }
 }

@@ -1,11 +1,11 @@
 use crate::arch::x86_64::interrupts::InterruptIndex;
 use pic8259_simple::ChainedPics;
-use spin::Mutex;
+use spinning_top::Spinlock;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
-static PICS: Mutex<ChainedPics> =
-    Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
+static PICS: Spinlock<ChainedPics> =
+    Spinlock::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 
 pub fn init() {
     unsafe { PICS.lock().initialize() };

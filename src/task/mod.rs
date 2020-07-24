@@ -4,8 +4,9 @@ use core::task::{Context, Poll};
 use core::{future, pin::Pin};
 
 pub mod executor;
-pub mod keyboard;
 pub mod simple_executor;
+
+pub use executor::{spawn_task, Executor};
 
 /// Stores a unique ID that is used by executors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

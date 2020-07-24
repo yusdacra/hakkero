@@ -1,4 +1,5 @@
 use super::{Task, TaskId};
+use crate::common::Once;
 use alloc::{
     collections::{BTreeMap, VecDeque},
     sync::Arc,
@@ -6,7 +7,6 @@ use alloc::{
 };
 use core::task::{Context, Poll, Waker};
 use crossbeam_queue::ArrayQueue;
-use spin::Once;
 
 struct TaskWaker {
     task_id: TaskId,
@@ -39,7 +39,7 @@ static WFTQ: Once<Arc<ArrayQueue<Task>>> = Once::new();
 pub fn spawn_task(task: Task) {
     use log::warn;
 
-    if let Some(s) = WFTQ.r#try() {
+    if let Some(s) = WFTQ.get() {
         if s.push(task).is_err() {
             warn!("can't spawn task, queue full!");
         }
@@ -63,7 +63,7 @@ pub struct Executor {
 impl Executor {
     pub fn new() -> Self {
         let waiting_for_task_queue = Arc::new(ArrayQueue::new(TASK_QUEUE_LIMIT));
-        WFTQ.call_once(|| waiting_for_task_queue.clone());
+        WFTQ.try_init(waiting_for_task_queue.clone());
         Executor {
             task_queue: VecDeque::new(),
             waiting_for_task_queue,

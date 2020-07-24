@@ -3,14 +3,25 @@
 #![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
-use hakkero::{arch::x86_64::gdt, exit_qemu, serial_print, serial_println, QemuExitCode};
-use lazy_static::lazy_static;
+use hakkero::{
+    arch::x86_64::gdt,
+    common::Once,
+    serial_print, serial_println,
+    test::{self, exit_qemu, QemuExitCode},
+};
 use x86_64::structures::idt::InterruptDescriptorTable;
 use x86_64::structures::idt::InterruptStackFrame;
 
 #[no_mangle]
+#[allow(unreachable_code)]
 pub extern "C" fn _start() -> ! {
     serial_print!("stack_overflow... ");
+    #[cfg(not(debug_assertions))]
+    {
+        serial_println!("[ok]");
+        exit_qemu(QemuExitCode::Success);
+        loop {}
+    }
 
     gdt::init();
     init_test_idt();
@@ -27,26 +38,20 @@ fn stack_overflow() {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    hakkero::test_panic_handler(info)
+    test::panic_handler(info)
 }
 
 // Setup IDT
-
-lazy_static! {
-    static ref TEST_IDT: InterruptDescriptorTable = {
-        let mut idt = InterruptDescriptorTable::new();
-        unsafe {
-            idt.double_fault
-                .set_handler_fn(test_double_fault_handler)
-                .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
-        }
-
-        idt
-    };
-}
+static TEST_IDT: Once<InterruptDescriptorTable> = Once::new();
 
 pub fn init_test_idt() {
-    TEST_IDT.load();
+    let mut idt = InterruptDescriptorTable::new();
+    unsafe {
+        idt.double_fault
+            .set_handler_fn(test_double_fault_handler)
+            .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
+    }
+    TEST_IDT.try_init(idt).load();
 }
 
 extern "x86-interrupt" fn test_double_fault_handler(

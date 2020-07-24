@@ -1,14 +1,14 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
-#![test_runner(hakkero::test_runner)]
+#![test_runner(test::runner)]
 #![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use hakkero::{serial_print, serial_println};
+use hakkero::{serial_print, serial_println, test};
 
 entry_point!(main);
 
@@ -21,7 +21,7 @@ fn main(boot_info: &'static BootInfo) -> ! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    hakkero::test_panic_handler(info)
+    test::panic_handler(info)
 }
 
 /// Tests

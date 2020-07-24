@@ -1,22 +1,24 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks, asm, alloc_prelude)]
-#![test_runner(hakkero::test_runner)]
+#![test_runner(hakkero::test::runner)]
 #![reexport_test_harness_main = "test_main"]
 
 use bootloader::{entry_point, BootInfo};
 extern crate alloc;
 
 use core::panic::PanicInfo;
-use hakkero::task::{
-    executor::{spawn_task, Executor},
-    keyboard, Task,
+use hakkero::arch::x86_64::{
+    device::vga::Readline,
+    start,
+    task::{handle_scancodes, DecodedKeyStream},
 };
+use hakkero::task::{spawn_task, Executor, Task};
 
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Initialize phase
-    hakkero::arch::x86_64::start(boot_info);
+    start(boot_info);
 
     // We run tests before everything to avoid interference
     #[cfg(test)]
@@ -31,23 +33,24 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 }
 
 fn some_info() {
+    use hakkero::allocator::*;
     use log::info;
 
-    info!("Heap start: {}", hakkero::allocator::HEAP_START);
-    info!("Heap size: {}", hakkero::allocator::HEAP_SIZE);
-    info!("Heap usage: {}", hakkero::allocator::ALLOCATOR.lock().used_heap());
+    info!("Heap start: {}", HEAP_START);
+    info!("Heap size: {}", HEAP_SIZE);
+    info!("Heap usage: {}", ALLOCATOR.lock().used_heap());
 }
 
 async fn start_handlers() {
-    spawn_task(Task::new(keyboard::handle_scancodes()));
+    spawn_task(Task::new(handle_scancodes()));
     spawn_task(Task::new(handle_decoded_keys()));
 }
 
 async fn handle_decoded_keys() {
     use futures_util::stream::StreamExt;
 
-    let mut queue = hakkero::task::keyboard::DecodedKeyStream;
-    let mut rl = hakkero::arch::x86_64::device::vga::Readline::new();
+    let mut queue = DecodedKeyStream;
+    let mut rl = Readline::new();
 
     while let Some(key) = queue.next().await {
         if let Some(s) = rl.handle_key(key) {
@@ -67,5 +70,5 @@ fn panic(info: &PanicInfo) -> ! {
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    hakkero::test_panic_handler(info)
+    hakkero::test::panic_handler(info)
 }

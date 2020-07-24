@@ -1,13 +1,16 @@
+#![cfg(target_arch = "x86_64")]
+
 pub mod device;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
+pub mod task;
 
 use bootloader::BootInfo;
 
 #[no_mangle]
 pub fn start(boot_info: &'static BootInfo) {
-    crate::Logger::init(log::LevelFilter::Trace);
+    crate::common::Logger::init(log::LevelFilter::Trace);
     gdt::init();
     interrupts::init_idt();
     device::init();
