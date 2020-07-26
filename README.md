@@ -5,8 +5,8 @@ My implementation of https://os.phil-opp.com/. Currently implements up to post 1
 - `rust-src` and `llvm-tools-preview` components
 - cargo-xbuild ~ for cross-compiling
 - bootimage ~ to create a bootable image
-- QEMU ~ to work on and test the OS
+- QEMU ~ to test the OS
 
-## Building
-- `cargo-xrun` to launch the OS in QEMU
-- `cargo-xtest` to run the tests
+## Running
+Use the provided `build.sh` script.
+Run `build.sh help` to get a list of commands and architectures.

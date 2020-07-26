@@ -1,5 +1,3 @@
-#![cfg(target_arch = "x86_64")]
-
 pub mod device;
 pub mod gdt;
 pub mod interrupts;
@@ -8,9 +6,10 @@ pub mod task;
 
 use bootloader::BootInfo;
 
-#[no_mangle]
+#[allow(clippy::inline_always)]
+#[inline(always)] // Inline because it will be only used once anyways
 pub fn start(boot_info: &'static BootInfo) {
-    crate::common::Logger::init(log::LevelFilter::Trace);
+    crate::common::init();
     gdt::init();
     interrupts::init_idt();
     device::init();
@@ -19,6 +18,8 @@ pub fn start(boot_info: &'static BootInfo) {
 
 /// Initializes the heap.
 /// This gets the mapper and a `BootInfoFrameAllocator` from the given `BootInfo`, then calls `setup_heap` from the `allocator` module.
+#[allow(clippy::inline_always)]
+#[inline(always)] // Inline because it will be only used once anyways
 pub fn init_heap(boot_info: &'static BootInfo) {
     let phys_mem_offset = x86_64::VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };

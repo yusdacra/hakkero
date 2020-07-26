@@ -13,6 +13,8 @@ use x86_64::{
 ///
 /// # Errors
 /// Can error when a frame allocation or mapping fails.
+#[allow(clippy::inline_always)]
+#[inline(always)] // Inline because it will be only used once anyways
 pub fn setup_heap(
     mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,

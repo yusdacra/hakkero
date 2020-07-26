@@ -81,27 +81,26 @@ impl Executor {
         loop {
             self.wake_tasks();
             self.run_ready_tasks();
+            #[cfg(target_arch = "x86_64")]
             self.sleep_if_idle(); // Getting here means that there are no tasks left in `task_queue`
         }
     }
 
+    #[cfg(target_arch = "x86_64")]
     fn sleep_if_idle(&self) {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use x86_64::instructions::interrupts::{self, enable_interrupts_and_hlt};
+        use x86_64::instructions::interrupts::{self, enable_interrupts_and_hlt};
 
-            // Return early, no need to disable interrupts
-            if !self.wake_queue.is_empty() {
-                return;
-            }
+        // Return early, no need to disable interrupts
+        if !self.wake_queue.is_empty() {
+            return;
+        }
 
-            interrupts::disable();
-            // If an interrupt happened inbetween, interrupts will be enabled
-            if self.wake_queue.is_empty() {
-                enable_interrupts_and_hlt();
-            } else {
-                interrupts::enable();
-            }
+        interrupts::disable();
+        // If an interrupt happened inbetween, interrupts will be enabled
+        if self.wake_queue.is_empty() {
+            enable_interrupts_and_hlt();
+        } else {
+            interrupts::enable();
         }
     }
 

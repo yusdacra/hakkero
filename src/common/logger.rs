@@ -38,6 +38,13 @@ impl Log for Logger {
                     crate::serial_println!("[{:5}] {}", record.level(), record.args());
                 }
             }
+            #[cfg(target_arch = "aarch64")]
+            {
+                #[cfg(feature = "log_serial")]
+                {
+                    crate::console_println!("[{:5}] {}", record.level(), record.args());
+                }
+            }
         }
     }
 

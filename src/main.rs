@@ -9,6 +9,8 @@
 extern crate alloc;
 
 use core::panic::PanicInfo;
+#[cfg(target_arch = "aarch64")]
+use hakkero::arch::aarch64::start;
 #[cfg(target_arch = "x86_64")]
 use {
     bootloader::{entry_point, BootInfo},
@@ -41,6 +43,16 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     executor.run();
 }
 
+#[cfg(target_arch = "aarch64")]
+#[no_mangle]
+extern "C" fn kernel_main() -> ! {
+    start();
+
+    hakkero::console_println!("Hello world!");
+
+    panic!()
+}
+
 // Only compile on systems where we have heap setup
 #[cfg(target_arch = "x86_64")]
 fn heap_info() {
@@ -55,7 +67,7 @@ fn heap_info() {
 #[cfg(target_arch = "x86_64")]
 async fn start_handlers() {
     spawn_task(Task::new(handle_scancodes()));
-    spawn_task(Task::new((|| async {
+    spawn_task(Task::new(async {
         use futures_util::stream::StreamExt;
 
         let mut queue = DecodedKeyStream;
@@ -66,7 +78,7 @@ async fn start_handlers() {
                 hakkero::println!("{}", s);
             }
         }
-    })()));
+    }));
 }
 
 /// This function is called on panic.
@@ -78,8 +90,10 @@ fn panic(info: &PanicInfo) -> ! {
     {
         hakkero::arch::x86_64::hlt_loop()
     }
-    #[cfg(not(target_arch = "x86_64"))]
-    loop {}
+    #[cfg(target_arch = "aarch64")]
+    {
+        hakkero::arch::aarch64::wait_forever()
+    }
 }
 
 // Only test on x86_64

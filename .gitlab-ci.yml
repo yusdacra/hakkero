@@ -23,7 +23,7 @@ check:
     paths:
         - ./target
   script:
-    - cargo xcheck --verbose
+    - ./build.sh check all
 
 test:
   stage: check
@@ -32,13 +32,4 @@ test:
     paths:
         - ./target
   script:
-    - cargo xtest --all --verbose
-
-clippy:
-  stage: check
-  cache:
-    key: "cache-linux"
-    paths:
-        - ./target
-  script:
-    - cargo xclippy --verbose
+    - ./build.sh test all

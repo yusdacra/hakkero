@@ -1,5 +1,2 @@
-[build]
-target = "x86_64-hakkero.json"
-
-[target.'cfg(target_os = "none")']
+[target.'cfg(target_arch = "x86_64")']
 runner = "bootimage runner"
