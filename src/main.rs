@@ -1,21 +1,30 @@
 #![no_std]
 #![no_main]
-#![feature(custom_test_frameworks, asm, alloc_prelude)]
+#![feature(custom_test_frameworks, llvm_asm)]
 #![test_runner(hakkero::test::runner)]
 #![reexport_test_harness_main = "test_main"]
 
-use bootloader::{entry_point, BootInfo};
+// Only compile on systems where we have heap setup
+#[cfg(target_arch = "x86_64")]
 extern crate alloc;
 
 use core::panic::PanicInfo;
-use hakkero::arch::x86_64::{
-    device::vga::Readline,
-    start,
-    task::{handle_scancodes, DecodedKeyStream},
+#[cfg(target_arch = "x86_64")]
+use {
+    bootloader::{entry_point, BootInfo},
+    hakkero::{
+        arch::x86_64::{
+            device::vga::Readline,
+            start,
+            task::{handle_scancodes, DecodedKeyStream},
+        },
+        task::{spawn_task, Executor, Task},
+    },
 };
-use hakkero::task::{spawn_task, Executor, Task};
 
+#[cfg(target_arch = "x86_64")]
 entry_point!(kernel_main);
+#[cfg(target_arch = "x86_64")]
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Initialize phase
     start(boot_info);
@@ -24,7 +33,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     #[cfg(test)]
     test_main();
 
-    some_info();
+    heap_info();
 
     let mut executor = Executor::new();
     executor.spawn(Task::new(start_handlers()));
@@ -32,7 +41,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     executor.run();
 }
 
-fn some_info() {
+// Only compile on systems where we have heap setup
+#[cfg(target_arch = "x86_64")]
+fn heap_info() {
     use hakkero::allocator::*;
     use log::info;
 
@@ -41,22 +52,21 @@ fn some_info() {
     info!("Heap usage: {}", ALLOCATOR.lock().used_heap());
 }
 
+#[cfg(target_arch = "x86_64")]
 async fn start_handlers() {
     spawn_task(Task::new(handle_scancodes()));
-    spawn_task(Task::new(handle_decoded_keys()));
-}
+    spawn_task(Task::new((|| async {
+        use futures_util::stream::StreamExt;
 
-async fn handle_decoded_keys() {
-    use futures_util::stream::StreamExt;
+        let mut queue = DecodedKeyStream;
+        let mut rl = Readline::new();
 
-    let mut queue = DecodedKeyStream;
-    let mut rl = Readline::new();
-
-    while let Some(key) = queue.next().await {
-        if let Some(s) = rl.handle_key(key) {
-            hakkero::println!("{}", s);
+        while let Some(key) = queue.next().await {
+            if let Some(s) = rl.handle_key(key) {
+                hakkero::println!("{}", s);
+            }
         }
-    }
+    })()));
 }
 
 /// This function is called on panic.
@@ -64,9 +74,16 @@ async fn handle_decoded_keys() {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     log::error!("{}", info);
-    hakkero::arch::x86_64::hlt_loop()
+    #[cfg(target_arch = "x86_64")]
+    {
+        hakkero::arch::x86_64::hlt_loop()
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    loop {}
 }
 
+// Only test on x86_64
+#[cfg(target_arch = "x86_64")]
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {

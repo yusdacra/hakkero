@@ -1,6 +1,7 @@
 #![no_std]
 #![cfg_attr(test, no_main)]
 #![feature(
+    llvm_asm,
     custom_test_frameworks,
     abi_x86_interrupt,
     toowned_clone_into,
