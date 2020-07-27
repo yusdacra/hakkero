@@ -23,7 +23,7 @@ check:
     paths:
         - ./target
   script:
-    - ./build.sh check all
+    - ./build.sh -v check all
 
 test:
   stage: check
@@ -32,4 +32,4 @@ test:
     paths:
         - ./target
   script:
-    - ./build.sh test all
+    - ./build.sh -v test all

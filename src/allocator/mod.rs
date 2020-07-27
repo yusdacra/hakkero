@@ -48,7 +48,8 @@ impl<A> Locked<A> {
 
 /// Align the given address `addr` upwards to alignment `align`.
 ///
-/// Requires that `align` is a power of two.
-fn align_up(addr: usize, align: usize) -> usize {
+/// # Safety
+/// `align` must be a power of two.
+unsafe fn align_up(addr: usize, align: usize) -> usize {
     (addr + align - 1) & !(align - 1)
 }

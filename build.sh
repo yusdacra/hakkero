@@ -3,24 +3,32 @@
 
 AARCH64_DEF_BSP="rpi"
 
-COM=$1
-ARCH=$2
-BSP=$3
+if [[ "$1" = "-v" ]]; then
+    VERBOSE="--verbose"
+    COM=$2
+    ARCH=$3
+    BSP=$4
+else
+    VERBOSE=""
+    COM=$1
+    ARCH=$2
+    BSP=$3
+fi
 
 if [[ "$BSP" = "" ]]; then
     BSP=$AARCH64_DEF_BSP
 fi
 
 function x86_64_cmd () {
-    cargo $1 --verbose --target targets/x86_64-hakkero.json || exit 1
+    cargo $1 $VERBOSE --target targets/x86_64-hakkero.json || exit 1
 }
 
 function aarch64_cmd () {
     if [[ ! -r "src/arch/aarch64/device/$2/link.ld" ]]; then
         echo "BSP $2 isn't supported for aarch64"
-        return 1
+        exit 1
     fi
-    RUSTFLAGS="-C link-arg=-Tsrc/arch/aarch64/device/$2/link.ld" cargo $1 --verbose --target targets/aarch64-hakkero.json || exit 1
+    RUSTFLAGS="-C link-arg=-Tsrc/arch/aarch64/device/$2/link.ld" cargo $1 $VERBOSE --target targets/aarch64-hakkero.json || exit 1
 }
 
 function aarch64_run() {
@@ -82,13 +90,25 @@ case "$COM" in
                 ;;
         esac
         ;;
+    "doc")
+        case "$ARCH" in
+            "x86_64")
+                x86_64_cmd xdoc
+                ;;
+            "aarch64")
+                aarch64_cmd xdoc $BSP
+                ;;
+            *)
+                echo "Arch $ARCH not supported for this command"
+                ;;
+        esac
+        ;;
     "help")
-        echo "\
-        Usage: build.sh <command> <arch>
-        Commands: run, build, check
-        Supported architectures: x86_64, aarch64, all (runs command for all archs)
-        Supported aarch64 BSPs: rpi\
-        "
+        echo "Usage: build.sh [FLAG] <command> <arch>"
+        echo "Commands: run, build, check"
+        echo "Supported architectures: x86_64, aarch64, all (runs command for all archs)"
+        echo "Supported aarch64 BSPs: rpi"
+        echo "Use -v as FLAG to get verbose output."
         ;;
     *)
         echo "Command $COM not found"

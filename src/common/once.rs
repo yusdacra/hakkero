@@ -25,14 +25,14 @@ impl<T> Once<T> {
     /// Returns a reference to the data held inside.
     /// If `Once` is already initialized this function will do nothing.
     pub fn try_init(&self, data: T) -> &T {
-        if self.state.load(Ordering::SeqCst) {
-            return unsafe { self.get_unchecked() };
+        if self.state.compare_and_swap(false, true, Ordering::AcqRel) {
+            unsafe { self.get_unchecked() }
+        } else {
+            unsafe {
+                (*self.data.get()).as_mut_ptr().write(data);
+                self.get_unchecked()
+            }
         }
-        unsafe {
-            (*self.data.get()).as_mut_ptr().write(data);
-        }
-        self.state.store(true, Ordering::SeqCst);
-        unsafe { self.get_unchecked() }
     }
 
     /// Get a reference to the data held inside, without performing safety checks.
@@ -47,9 +47,29 @@ impl<T> Once<T> {
     ///
     /// Returns `None` if `Once` wasn't initialized, `Some(&T)` otherwise.
     pub fn get(&self) -> Option<&T> {
-        if !self.state.load(Ordering::SeqCst) {
+        if !self.state.load(Ordering::Relaxed) {
             return None;
         }
         Some(unsafe { self.get_unchecked() })
     }
+}
+
+#[cfg(test)]
+use crate::{serial_print, serial_println};
+
+#[test_case]
+fn test_once_notinit() {
+    serial_print!("test_once_notinit... ");
+    let once: Once<bool> = Once::new();
+    assert_eq!(once.get(), None);
+    serial_println!("[ok]");
+}
+
+#[test_case]
+fn test_once_init() {
+    serial_print!("test_once_init... ");
+    let once: Once<bool> = Once::new();
+    assert_eq!(*once.try_init(true), true);
+    assert_eq!(*once.get().unwrap(), true);
+    serial_println!("[ok]");
 }
