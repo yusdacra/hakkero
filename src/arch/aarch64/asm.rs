@@ -1,17 +1,17 @@
 pub fn wfe() {
     unsafe {
-        llvm_asm!("wfe" :::: "volatile");
+        asm!("wfe", options(nomem, nostack));
     }
 }
 
 pub fn sev() {
     unsafe {
-        llvm_asm!("sev" :::: "volatile");
+        asm!("sev", options(nomem, nostack));
     }
 }
 
 pub fn wfi() {
     unsafe {
-        llvm_asm!("wfi" :::: "volatile");
+        asm!("wfi", options(nomem, nostack));
     }
 }

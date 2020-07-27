@@ -15,7 +15,7 @@ pub fn start() {
 
 pub fn wait_forever() -> ! {
     loop {
-        asm::wfe();
+        asm::wfi();
     }
 }
 

@@ -6,18 +6,16 @@ use alloc::{
     task::Wake,
 };
 use core::task::{Context, Poll, Waker};
-use crossbeam_queue::ArrayQueue;
+use crossbeam_queue::SegQueue;
 
 struct TaskWaker {
     task_id: TaskId,
-    wake_queue: Arc<ArrayQueue<TaskId>>,
+    wake_queue: Arc<SegQueue<TaskId>>,
 }
 
 impl TaskWaker {
     fn wake_task(&self) {
-        self.wake_queue
-            .push(self.task_id)
-            .expect("wake_queue is full");
+        self.wake_queue.push(self.task_id);
     }
 }
 
@@ -31,44 +29,49 @@ impl Wake for TaskWaker {
     }
 }
 
+#[derive(Debug)]
+pub enum SpawnError {
+    ExecutorNotInitialized,
+}
+
 /// Clone of `waiting_for_task_queue` in the Executor.
-static WFTQ: Once<Arc<ArrayQueue<Task>>> = Once::new();
+static WFTQ: Once<Arc<SegQueue<Task>>> = Once::new();
 
 /// Queues the task to be run in the next poll.
-/// Will fail if the queue is full, or the executor has not been initialized.
-pub fn spawn_task(task: Task) {
+///
+/// # Errors
+/// Returns an error if the executor has not been initialized.
+pub fn spawn_task(task: Task) -> Result<(), SpawnError> {
     use log::warn;
 
     if let Some(s) = WFTQ.get() {
-        if s.push(task).is_err() {
-            warn!("can't spawn task, queue full!");
-        }
+        s.push(task);
     } else {
         warn!("executor not initialized, can't spawn task");
+        return Err(SpawnError::ExecutorNotInitialized);
     }
-}
 
-/// How many tasks / wakers can be queued.
-pub const TASK_QUEUE_LIMIT: usize = 100;
+    Ok(())
+}
 
 /// Simple FIFO task executor. Supports wakers.
 pub struct Executor {
     task_queue: VecDeque<Task>,
-    waiting_for_task_queue: Arc<ArrayQueue<Task>>,
+    waiting_for_task_queue: Arc<SegQueue<Task>>,
     waiting_tasks: BTreeMap<TaskId, Task>,
-    wake_queue: Arc<ArrayQueue<TaskId>>,
+    wake_queue: Arc<SegQueue<TaskId>>,
     waker_cache: BTreeMap<TaskId, Waker>,
 }
 
 impl Executor {
     pub fn new() -> Self {
-        let waiting_for_task_queue = Arc::new(ArrayQueue::new(TASK_QUEUE_LIMIT));
+        let waiting_for_task_queue = Arc::new(SegQueue::new());
         WFTQ.try_init(waiting_for_task_queue.clone());
         Executor {
             task_queue: VecDeque::new(),
             waiting_for_task_queue,
             waiting_tasks: BTreeMap::new(),
-            wake_queue: Arc::new(ArrayQueue::new(TASK_QUEUE_LIMIT)),
+            wake_queue: Arc::new(SegQueue::new()),
             waker_cache: BTreeMap::new(),
         }
     }
@@ -150,4 +153,16 @@ impl Executor {
             }
         }
     }
+}
+
+#[cfg(test)]
+use crate::{serial_print, serial_println};
+
+#[test_case]
+fn test_task_spawn_exec() {
+    serial_print!("test_task_spawn_exec... ");
+    let mut executor = Executor::new();
+    executor.spawn(Task::new(async { () }));
+    assert!(executor.task_queue.front().is_some());
+    serial_println!("[ok]");
 }

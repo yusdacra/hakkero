@@ -66,7 +66,7 @@ fn heap_info() {
 
 #[cfg(target_arch = "x86_64")]
 async fn start_handlers() {
-    spawn_task(Task::new(handle_scancodes()));
+    spawn_task(Task::new(handle_scancodes())).unwrap();
     spawn_task(Task::new(async {
         use futures_util::stream::StreamExt;
 
@@ -78,7 +78,8 @@ async fn start_handlers() {
                 hakkero::println!("{}", s);
             }
         }
-    }));
+    }))
+    .unwrap();
 }
 
 /// This function is called on panic.
