@@ -12,7 +12,7 @@ if [[ "$BSP" = "" ]]; then
 fi
 
 function x86_64_cmd () {
-    cargo $1 --verbose --target targets/x86_64-hakkero.json
+    cargo $1 --verbose --target targets/x86_64-hakkero.json || exit 1
 }
 
 function aarch64_cmd () {
@@ -20,12 +20,12 @@ function aarch64_cmd () {
         echo "BSP $2 isn't supported for aarch64"
         return 1
     fi
-    RUSTFLAGS="-C link-arg=-Tsrc/arch/aarch64/device/$2/link.ld" cargo $1 --verbose --target targets/aarch64-hakkero.json
+    RUSTFLAGS="-C link-arg=-Tsrc/arch/aarch64/device/$2/link.ld" cargo $1 --verbose --target targets/aarch64-hakkero.json || exit 1
 }
 
 function aarch64_run() {
     KERNEL="target/hakkero.img"
-    aarch64_cmd xbuild $1 || exit 1
+    aarch64_cmd xbuild $1
     rust-objcopy --strip-all -O binary target/aarch64-hakkero/debug/hakkero $KERNEL
     qemu-system-aarch64 -kernel $KERNEL -serial stdio -display none -machine raspi3
 }
