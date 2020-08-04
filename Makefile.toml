@@ -1,0 +1,127 @@
+[env.aarch64]
+arch = "aarch64"
+board = "raspi3"
+RUSTFLAGS = "--cfg board=\"${board}\""
+
+[env.x86_64]
+arch = "x86_64"
+
+[env.development]
+arch = "x86_64"
+
+[env]
+kernel_build = "target/${arch}-hakkero/debug/hakkero"
+kernel_binary = "target/${arch}-hakkero/debug/hakkero.bin"
+target_file = "targets/${arch}-hakkero.json"
+
+[tasks.install-rust-src]
+category = "Tools"
+description = "Installs rust-src rustup component."
+install_crate = { rustup_component_name = "rust-src" }
+
+[tasks.install-llvm-tools]
+category = "Tools"
+description = "Installs llvm-tools-preview rustup component."
+install_crate = { rustup_component_name = "llvm-tools-preview" }
+
+[tasks.install-binutils]
+category = "Tools"
+description = "Installs rust-binutils Cargo crate."
+install_crate = { crate_name = "rust-binutils", binary = "rust-objcopy", test_arg = "-V" }
+
+[tasks.install-bootimage]
+condition = { env = { arch = "x86_64" } }
+category = "Tools"
+description = "Installs bootimage Cargo crate."
+install_crate = { crate_name = "bootimage", binary = "bootimage", test_arg = "--help" }
+
+[tasks.install-cargo-xbuild]
+category = "Tools"
+description = "Installs cargo-xbuild Cargo crate."
+install_crate = { crate_name = "cargo-xbuild", binary = "cargo", test_arg = [ "xbuild", "--help" ] }
+dependencies = [ "install-rust-src" ]
+
+[tasks.install-deps]
+dependencies = [ "install-cargo-xbuild", "install-rust-src", "install-llvm-tools" ]
+
+[tasks.lint]
+category = "Tools"
+description = "Lint the project using xclippy."
+command = "cargo"
+args = [ "xclippy", "--target", "${target_file}" ]
+dependencies = [ "install-deps" ]
+
+[tasks.build]
+clear = true
+category = "Build"
+description = "Builds the project using xbuild."
+command = "cargo"
+args = [ "xbuild", "--target", "${target_file}" ]
+dependencies = [ "install-deps" ]
+
+[tasks.doc]
+clear = true
+category = "Tools"
+description = "Documents the project using xdoc."
+command = "cargo"
+args = [ "xdoc", "--target", "${target_file}" ]
+dependencies = [ "install-deps" ]
+
+[tasks.test]
+clear = true
+category = "Test"
+description = "Test the project using xtest."
+command = "cargo"
+args = [ "xtest", "--target", "${target_file}" ]
+dependencies = [ "build" ]
+
+[tasks.run]
+category = "Build"
+description = "Run the project using QEMU."
+dependencies = [ "run-x86_64", "run-aarch64" ]
+
+[tasks.run-x86_64]
+condition = { env = { arch = "x86_64" } }
+command = "qemu-system-x86_64"
+args = [
+ 	"-drive", "format=raw,file=target/x86_64-hakkero/debug/bootimage-hakkero.bin",
+ 	"-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
+ 	"-serial", "stdio"
+]
+dependencies = [ "build", "create-bootimage" ]
+
+[tasks.run-aarch64]
+condition = { env = { arch = "aarch64" }, env_set = [ "board" ] }
+command = "qemu-system-aarch64"
+args = [
+	"-machine", "raspi3",
+ 	"-serial", "stdio",
+ 	"-display", "none",
+ 	"-kernel", "${kernel_binary}"
+]
+dependencies = [ "build", "translate-to-binary" ]
+
+[tasks.create-bootimage]
+condition = { env = { arch = "x86_64" } }
+command = "cargo"
+args = [ "bootimage", "--target", "${target_file}" ]
+dependencies = [ "install-bootimage" ]
+
+[tasks.translate-to-binary]
+condition = { env = { arch = "aarch64" } }
+command = "rust-objcopy"
+args = [ "-O", "binary", "${kernel_build}", "${kernel_binary}" ]
+dependencies = [ "build", "install-binutils" ]
+
+[tasks.disasm]
+category = "Tools"
+description = "Dissassembly the kernel build for inspection."
+script_runner = "@shell"
+script = [
+	"rust-objdump --disassemble-all ${kernel_build} | less"
+]
+dependencies = [ "install-binutils", "build" ]
+
+[tasks.default]
+description = "Development testing flow will first format and lint the code, and then run cargo build and test"
+dependencies = [ "format", "lint", "build", "test" ]

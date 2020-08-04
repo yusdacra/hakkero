@@ -1,13 +1,9 @@
-#![cfg(target_arch = "x86_64")]
-
+//! Stuff needed for testing.
 use crate::serial_println;
 use core::panic::PanicInfo;
 
 #[cfg(test)]
-use {
-    crate::arch,
-    bootloader::{entry_point, BootInfo},
-};
+use crate::entry_point;
 
 pub fn runner(tests: &[&dyn Fn()]) {
     serial_println!("Running {} tests", tests.len());
@@ -33,11 +29,23 @@ pub enum QemuExitCode {
 }
 
 pub fn exit_qemu(exit_code: QemuExitCode) {
-    use x86_64::instructions::port::Port;
+    #[cfg(target_arch = "x86_64")]
+    {
+        use x86_64::instructions::port::PortWriteOnly;
 
-    unsafe {
-        let mut port = Port::new(0xf4);
-        port.write(exit_code as u32);
+        unsafe {
+            let mut port = PortWriteOnly::new(0xf4);
+            port.write(exit_code as u32);
+        }
+    }
+    // TODO: Actually implement this
+    #[cfg(target_arch = "aarch64")]
+    {
+        let _holder = exit_code;
+        unsafe {
+            asm!("ldr x0, =0x84000008");
+            asm!("hvc #0");
+        }
     }
 }
 
@@ -46,8 +54,7 @@ entry_point!(kernel_main);
 
 /// Entry point for `cargo xtest`
 #[cfg(test)]
-fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    arch::x86_64::start(boot_info);
+fn kernel_main() -> ! {
     crate::test_main();
     loop {}
 }

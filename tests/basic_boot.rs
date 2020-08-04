@@ -7,8 +7,17 @@
 use core::panic::PanicInfo;
 use hakkero::{serial_print, serial_println};
 
-#[no_mangle] // don't mangle the name of this function
+#[cfg(target_arch = "x86_64")]
+#[no_mangle]
 pub extern "C" fn _start() -> ! {
+    test_main();
+
+    loop {}
+}
+
+#[cfg(target_arch = "aarch64")]
+#[no_mangle]
+pub extern "C" fn kernel_main() -> ! {
     test_main();
 
     loop {}

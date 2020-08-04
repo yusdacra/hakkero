@@ -1,3 +1,4 @@
+//! Implements simple `Future` based `Task`s.
 use alloc::boxed::Box;
 use core::sync::atomic::{AtomicU64, Ordering};
 use core::task::{Context, Poll};
@@ -22,12 +23,14 @@ impl TaskId {
     }
 }
 
+/// A task. Contains a `Future` and a `TaskId`.
 pub struct Task {
     id: TaskId,
     future: Pin<Box<dyn Future>>,
 }
 
 impl Task {
+    /// Creates a new `Task`.
     pub fn new(future: impl Future + 'static) -> Task {
         Task {
             id: TaskId::new(),

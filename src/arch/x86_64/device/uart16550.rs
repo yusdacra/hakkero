@@ -30,11 +30,11 @@ pub fn _print(args: core::fmt::Arguments) {
 
 #[macro_export]
 macro_rules! serial_print {
-    ($($arg:tt)*) => ($crate::arch::x86_64::device::uart16550::_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => ($crate::arch::device::uart16550::_print(format_args!($($arg)*)));
 }
 
 #[macro_export]
 macro_rules! serial_println {
-    () => ($crate::arch::x86_64::device::uart16550::_print(format_args!("\n")));
-    ($($arg:tt)*) => ($crate::arch::x86_64::device::uart16550::_print(format_args!("{}\n", format_args!($($arg)*))));
+    () => ($crate::arch::device::uart16550::_print(format_args!("\n")));
+    ($($arg:tt)*) => ($crate::arch::device::uart16550::_print(format_args!("{}\n", format_args!($($arg)*))));
 }

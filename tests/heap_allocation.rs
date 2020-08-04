@@ -1,3 +1,4 @@
+#![cfg(target_arch = "x86_64")]
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
@@ -6,15 +7,12 @@
 
 extern crate alloc;
 
-use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use hakkero::{serial_print, serial_println, test};
+use hakkero::{entry_point, serial_print, serial_println, test};
 
 entry_point!(main);
 
-fn main(boot_info: &'static BootInfo) -> ! {
-    hakkero::arch::x86_64::start(boot_info);
-
+fn main() -> ! {
     test_main();
     loop {}
 }

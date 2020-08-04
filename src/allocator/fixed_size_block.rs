@@ -1,3 +1,5 @@
+//! Simple fixed size block allocator.
+//! Falls back to a linked list allocator when it can't allocate.
 use super::Locked;
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::{mem, ptr, ptr::NonNull};
@@ -46,6 +48,17 @@ impl Allocator {
 
     /// Calculates how much of the heap is used.
     pub fn used_heap(&self) -> usize {
+        fn follow_list_head<'a>(
+            head: &Option<&'a mut ListNode>,
+            count: usize,
+        ) -> (&'a Option<&'a mut ListNode>, usize) {
+            if let Some(h) = head {
+                follow_list_head(&h.next, count + 1)
+            } else {
+                (&None, count)
+            }
+        }
+
         let mut res = self.fallback_allocator.used();
         for (i, head) in self.list_heads.iter().enumerate() {
             let (_, count) = follow_list_head(head, 0);
@@ -61,17 +74,6 @@ impl Allocator {
 fn list_index(layout: &Layout) -> Option<usize> {
     let required_block_size = layout.size().max(layout.align());
     BLOCK_SIZES.iter().position(|&s| s >= required_block_size)
-}
-
-fn follow_list_head<'a>(
-    head: &Option<&'a mut ListNode>,
-    count: usize,
-) -> (&'a Option<&'a mut ListNode>, usize) {
-    if let Some(h) = head {
-        follow_list_head(&h.next, count + 1)
-    } else {
-        (&None, count)
-    }
 }
 
 unsafe impl GlobalAlloc for Locked<Allocator> {

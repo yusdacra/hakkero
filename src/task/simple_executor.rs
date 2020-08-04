@@ -1,22 +1,28 @@
+//! Dummy `Task` executor.
 use super::Task;
 use alloc::collections::VecDeque;
 use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
+/// Simple FIFO executor which does not wake up tasks.
 pub struct SimpleExecutor {
     task_queue: VecDeque<Task>,
 }
 
 impl SimpleExecutor {
+    /// Creates a new `SimpleExecutor`.
     pub fn new() -> Self {
         SimpleExecutor {
             task_queue: VecDeque::new(),
         }
     }
 
-    pub fn spawn(&mut self, task: Task) {
-        self.task_queue.push_back(task)
+    /// Spawns a task by queuing it.
+    pub fn spawn(mut self, task: Task) -> Self {
+        self.task_queue.push_back(task);
+        self
     }
 
+    /// Runs all the tasks in the queue and returns.
     pub fn run(&mut self) {
         while let Some(mut task) = self.task_queue.pop_front() {
             let waker = dummy_waker();

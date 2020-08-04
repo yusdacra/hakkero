@@ -1,5 +1,6 @@
+//! Simple FIFO `Task` executor.
 use super::{Task, TaskId};
-use crate::common::Once;
+use crate::misc::Once;
 use alloc::{
     collections::{BTreeMap, VecDeque},
     sync::Arc,
@@ -29,6 +30,7 @@ impl Wake for TaskWaker {
     }
 }
 
+/// Error returned by the `spawn_task` function.
 #[derive(Debug)]
 pub enum SpawnError {
     ExecutorNotInitialized,
@@ -64,6 +66,7 @@ pub struct Executor {
 }
 
 impl Executor {
+    /// Creates a new `Executor`.
     pub fn new() -> Self {
         let waiting_for_task_queue = Arc::new(SegQueue::new());
         WFTQ.try_init(waiting_for_task_queue.clone());
@@ -76,10 +79,13 @@ impl Executor {
         }
     }
 
-    pub fn spawn(&mut self, task: Task) {
-        self.task_queue.push_back(task)
+    /// Spawns the given `Task` by queuing it.
+    pub fn spawn(mut self, task: Task) -> Self {
+        self.task_queue.push_back(task);
+        self
     }
 
+    /// Starts logic loop; waking tasks, running ready tasks and sleeping.
     pub fn run(&mut self) -> ! {
         loop {
             self.wake_tasks();
@@ -161,8 +167,7 @@ use crate::{serial_print, serial_println};
 #[test_case]
 fn test_task_spawn_exec() {
     serial_print!("test_task_spawn_exec... ");
-    let mut executor = Executor::new();
-    executor.spawn(Task::new(async { () }));
+    let executor = Executor::new().spawn(Task::new(async { () }));
     assert!(executor.task_queue.front().is_some());
     serial_println!("[ok]");
 }

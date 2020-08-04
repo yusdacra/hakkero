@@ -2,13 +2,21 @@
 #![no_main]
 
 use core::panic::PanicInfo;
-use hakkero::{
-    serial_print, serial_println,
-    test::{exit_qemu, QemuExitCode},
-};
+use hakkero::test::{exit_qemu, QemuExitCode};
+use hakkero::{serial_print, serial_println};
 
+#[cfg(target_arch = "x86_64")]
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    should_fail();
+    serial_println!("[test did not panic]");
+    exit_qemu(QemuExitCode::Failed);
+    loop {}
+}
+
+#[cfg(target_arch = "aarch64")]
+#[no_mangle]
+pub extern "C" fn kernel_main() -> ! {
     should_fail();
     serial_println!("[test did not panic]");
     exit_qemu(QemuExitCode::Failed);

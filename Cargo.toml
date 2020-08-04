@@ -41,6 +41,8 @@ default-features = false
 features = ["alloc"]
 version = "^0.3"
 
+# x86_64 specific stuff
+
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 bootloader = { version = "^0.9", features = ["map_physical_memory"] }
 pc-keyboard = "^0.5"

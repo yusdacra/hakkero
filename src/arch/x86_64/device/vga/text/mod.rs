@@ -160,7 +160,7 @@ impl core::fmt::Write for Writer {
 
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::arch::x86_64::device::vga::text::_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => ($crate::arch::device::vga::text::_print(format_args!($($arg)*)));
 }
 
 #[macro_export]
@@ -171,7 +171,7 @@ macro_rules! println {
 
 #[macro_export]
 macro_rules! print_colored {
-    ($color:expr, $($arg:tt)*) => ($crate::arch::x86_64::device::vga::text::_print_colored($color, format_args!($($arg)*)));
+    ($color:expr, $($arg:tt)*) => ($crate::arch::device::vga::text::_print_colored($color, format_args!($($arg)*)));
 }
 
 #[macro_export]

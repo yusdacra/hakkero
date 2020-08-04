@@ -1,17 +1,17 @@
+//! The very powerful furnace OS.
 #![no_std]
 #![cfg_attr(test, no_main)]
 #![feature(
     asm,
-    global_asm,
+    decl_macro,
     custom_test_frameworks,
     abi_x86_interrupt,
-    toowned_clone_into,
     alloc_error_handler,
+    naked_functions,
     const_fn,
     const_in_array_repeat_expressions,
     wake_trait,
     trait_alias,
-    shrink_to,
     maybe_uninit_ref
 )]
 #![reexport_test_harness_main = "test_main"]
@@ -23,6 +23,7 @@ extern crate alloc;
 
 pub mod allocator;
 pub mod arch;
-pub mod common;
+pub mod memory;
+pub mod misc;
 pub mod task;
 pub mod test;

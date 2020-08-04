@@ -13,9 +13,12 @@ use x86_64::{
 ///
 /// # Errors
 /// Can error when a frame allocation or mapping fails.
+///
+/// # Safety
+/// Must only be called once.
 #[allow(clippy::inline_always)]
 #[inline(always)] // Inline because it will be only used once anyways
-pub fn setup_heap(
+pub unsafe fn setup_heap(
     mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
 ) -> Result<(), MapToError<Size4KiB>> {
@@ -32,16 +35,12 @@ pub fn setup_heap(
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-        unsafe {
-            mapper.map_to(page, frame, flags, frame_allocator)?.flush();
-        };
+        mapper.map_to(page, frame, flags, frame_allocator)?.flush();
     }
 
-    unsafe {
-        crate::allocator::ALLOCATOR
-            .lock()
-            .init(HEAP_START, HEAP_SIZE);
-    }
+    crate::allocator::ALLOCATOR
+        .lock()
+        .init(HEAP_START, HEAP_SIZE);
 
     Ok(())
 }
@@ -104,7 +103,9 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
 /// complete physical memory is mapped to virtual memory at the passed
 /// `physical_memory_offset`. Also, this function must be only called once
 /// to avoid aliasing `&mut` references (which is undefined behavior).
-pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
+#[allow(clippy::inline_always)]
+#[inline(always)] // Inline because it will be only used once anyways
+pub unsafe fn init_offset_page_table(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
     let level_4_table = active_level_4_table(physical_memory_offset);
     OffsetPageTable::new(level_4_table, physical_memory_offset)
 }
@@ -116,7 +117,9 @@ pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static>
 /// complete physical memory is mapped to virtual memory at the passed
 /// `physical_memory_offset`. Also, this function must be only called once
 /// to avoid aliasing `&mut` references (which is undefined behavior).
-pub unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
+#[allow(clippy::inline_always)]
+#[inline(always)] // Inline because it will be only used once anyways
+unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
     use x86_64::registers::control::Cr3;
 
     let (level_4_table_frame, _) = Cr3::read();
@@ -125,7 +128,7 @@ pub unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static
     let virt = physical_memory_offset + phys.as_u64();
     let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
 
-    &mut *page_table_ptr // unsafe
+    &mut *page_table_ptr
 }
 
 /// Creates an example mapping for the given page to frame `0xb8000`.

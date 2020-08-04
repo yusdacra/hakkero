@@ -1,4 +1,4 @@
-use crate::common::Once;
+use crate::misc::Once;
 use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector};
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::VirtAddr;
@@ -13,13 +13,17 @@ struct Selectors {
 static GDT: Once<(GlobalDescriptorTable, Selectors)> = Once::new();
 static TSS: Once<TaskStateSegment> = Once::new();
 
-pub fn init() {
+/// Initialize the GDT, TSS and CS.
+///
+/// # Safety
+/// Must only be called once.
+pub unsafe fn init() {
     let mut tss = TaskStateSegment::new();
     tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = {
         const STACK_SIZE: usize = 4096;
         static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
 
-        let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
+        let stack_start = VirtAddr::from_ptr(&STACK);
         stack_start + STACK_SIZE
     };
 
@@ -35,8 +39,6 @@ pub fn init() {
     ));
 
     gdt.0.load();
-    unsafe {
-        x86_64::instructions::segmentation::set_cs(gdt.1.code_selector);
-        x86_64::instructions::tables::load_tss(gdt.1.tss_selector);
-    }
+    x86_64::instructions::segmentation::set_cs(gdt.1.code_selector);
+    x86_64::instructions::tables::load_tss(gdt.1.tss_selector);
 }

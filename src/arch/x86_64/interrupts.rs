@@ -1,53 +1,26 @@
 use super::{
-    device::pic8259::{send_eoi, PIC_1_OFFSET},
-    gdt, hlt_loop,
+    device::pic8259::{self, keyboard_interrupt_handler, timer_interrupt_handler},
+    gdt,
 };
-use crate::common::Once;
+use crate::misc::Once;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
 
-pub fn init_idt() {
+/// Initializes the IDT.
+///
+/// # Safety
+/// Must only be called once.
+pub unsafe fn init_idt() {
     let mut idt = InterruptDescriptorTable::new();
     idt.breakpoint.set_handler_fn(breakpoint_handler);
     idt.page_fault.set_handler_fn(page_fault_handler);
-    unsafe {
-        idt.double_fault
-            .set_handler_fn(double_fault_handler)
-            .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
-    }
-    idt[InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
-    idt[InterruptIndex::Keyboard.as_usize()].set_handler_fn(keyboard_interrupt_handler);
+    idt.double_fault
+        .set_handler_fn(double_fault_handler)
+        .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
+    idt[pic8259::InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
+    idt[pic8259::InterruptIndex::Keyboard.as_usize()].set_handler_fn(keyboard_interrupt_handler);
     IDT.try_init(idt).load();
-}
-
-#[derive(Debug, Clone, Copy)]
-#[repr(u8)]
-pub enum InterruptIndex {
-    Timer = PIC_1_OFFSET,
-    Keyboard,
-}
-
-impl InterruptIndex {
-    pub fn as_u8(self) -> u8 {
-        self as u8
-    }
-
-    pub fn as_usize(self) -> usize {
-        usize::from(self.as_u8())
-    }
-}
-
-extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: &mut InterruptStackFrame) {
-    send_eoi(InterruptIndex::Timer);
-}
-
-extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: &mut InterruptStackFrame) {
-    let mut port = x86_64::instructions::port::Port::new(0x60);
-    let scancode: u8 = unsafe { port.read() };
-    super::task::keyboard::add_scancode(scancode);
-
-    send_eoi(InterruptIndex::Keyboard);
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut InterruptStackFrame) {
@@ -65,16 +38,17 @@ extern "x86-interrupt" fn page_fault_handler(
     stack_frame: &mut InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
-    use log::error;
-
-    error!("EXCEPTION: PAGE FAULT");
-    error!(
-        "Accessed Address: {:?}",
-        x86_64::registers::control::Cr2::read()
+    panic!(
+        "\
+EXPECTION: PAGE FAULT
+Accessed Address: {:?}
+Error Code: {:?}
+{:#?}
+        ",
+        x86_64::registers::control::Cr2::read(),
+        error_code,
+        stack_frame,
     );
-    error!("Error Code: {:?}", error_code);
-    error!("{:#?}", stack_frame);
-    hlt_loop()
 }
 
 // TESTS

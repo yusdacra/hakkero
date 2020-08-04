@@ -37,6 +37,9 @@ impl Readline {
                         self.offset_pos(-1);
                         self.buf.remove(self.pos);
                     }
+                    0x7f if self.pos < self.buf.len() => {
+                        self.buf.remove(self.pos);
+                    }
                     b'\n' => {
                         let mut res = SmallString::with_capacity(self.buf.capacity());
                         for c in self.buf.drain() {
@@ -262,6 +265,26 @@ fn test_backspace_empty_buf() {
     serial_print!("test_backspace_empty_buf... ");
     let mut rl = Readline::new();
     rl.handle_key(DecodedKey::Unicode('\u{8}'));
+    assert_eq!(rl.pos, 0);
+    serial_println!("[ok]");
+}
+
+#[test_case]
+fn test_delete() {
+    serial_print!("test_delete... ");
+    let mut rl = Readline::new();
+    rl.buf = SmallString::from("a");
+    rl.handle_key(DecodedKey::Unicode('\u{7f}'));
+    assert!(rl.buf.is_empty());
+    assert_eq!(rl.pos, 0);
+    serial_println!("[ok]");
+}
+
+#[test_case]
+fn test_delete_empty_buf() {
+    serial_print!("test_delete_empty_buf... ");
+    let mut rl = Readline::new();
+    rl.handle_key(DecodedKey::Unicode('\u{7f}'));
     assert_eq!(rl.pos, 0);
     serial_println!("[ok]");
 }

@@ -1,3 +1,4 @@
+//! Structure that allows one time initialization of memory.
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};

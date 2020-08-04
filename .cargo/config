@@ -1,2 +1,8 @@
+[target.'cfg(all(target_arch = "aarch64", board = "qemu"))']
+runner = "qemu-system-aarch64 -machine virt,virtualization=on -m 1024M -serial stdio -display none -cpu cortex-a72 -kernel"
+
+[target.'cfg(all(target_arch = "aarch64", board = "raspi3"))']
+runner = "qemu-system-aarch64 -machine raspi3 -serial stdio -display none -kernel"
+
 [target.'cfg(target_arch = "x86_64")']
 runner = "bootimage runner"

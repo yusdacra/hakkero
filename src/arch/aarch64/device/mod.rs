@@ -1,1 +1,1 @@
-pub mod qemu_console;
+pub mod uart;

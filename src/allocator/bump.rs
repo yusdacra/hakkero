@@ -1,3 +1,4 @@
+//! Simple bump allocator.
 use super::{align_up, Locked};
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr;
@@ -29,6 +30,11 @@ impl Allocator {
         self.heap_start = heap_start;
         self.heap_end = heap_start + heap_size;
         self.next = heap_start;
+    }
+
+    /// Calculates how much of the heap is used.
+    pub fn used_heap(&self) -> usize {
+        (self.heap_end - self.heap_start) - self.next
     }
 }
 

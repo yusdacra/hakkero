@@ -1,3 +1,4 @@
+//! Contains allocators and common code for them.
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
 use spinning_top::{Spinlock, SpinlockGuard};
