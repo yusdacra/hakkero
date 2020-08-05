@@ -6,9 +6,6 @@
 
 mod panic;
 
-// NOTE: All supported architectures must have entry_point implemented!
-use hakkero::entry_point;
-
 // Only compile alloc on systems where we have heap setup
 #[cfg(target_arch = "x86_64")]
 extern crate alloc;
@@ -22,7 +19,8 @@ use hakkero::{
     task::{spawn_task, Executor, Task},
 };
 
-entry_point!(kernel_main);
+// NOTE: All supported architectures must have entry_point implemented!
+hakkero::arch::entry_point!(kernel_main);
 
 #[cfg(target_arch = "x86_64")]
 fn kernel_main() -> ! {
@@ -38,12 +36,11 @@ fn kernel_main() -> ! {
 
 #[cfg(target_arch = "aarch64")]
 fn kernel_main() -> ! {
+    log::info!("Welcome to Hakkero OS!\n");
+
     // We run tests before everything to avoid interference
     #[cfg(test)]
     test_main();
-
-    hakkero::serial_println!("Welcome to Hakkero OS!\n");
-    // log::info!("Welcome to Hakkero OS!\n");
 
     hakkero::arch::hang_cpu()
 }

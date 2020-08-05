@@ -1,3 +1,4 @@
+//! Common memory related functions.
 use core::ops::Range;
 
 /// Zero out a memory region.

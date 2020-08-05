@@ -14,11 +14,12 @@ use bootloader::BootInfo;
 #[allow(clippy::inline_always)]
 #[inline(always)] // Inline because it will be only used once anyways
 pub unsafe fn init(boot_info: &'static BootInfo) {
-    crate::misc::init();
+    crate::logger::init();
     gdt::init();
     interrupts::init_idt();
     device::init();
     init_heap(boot_info);
+    log::info!("Initialized all peripherals!");
 }
 
 /// Initializes the heap.
@@ -38,18 +39,15 @@ pub unsafe fn init_heap(boot_info: &'static BootInfo) {
 
 /// Make an entry point. This macro checks the signature of the provided
 /// function to make sure it's correct.
-#[macro_export]
-macro_rules! entry_point {
-    ($path:path) => {
-        bootloader::entry_point!(kernel_init);
-        fn kernel_init(boot_info: &'static bootloader::BootInfo) -> ! {
-            let entry: fn() -> ! = $path;
-            unsafe {
-                $crate::arch::init(boot_info);
-            }
-            entry()
+pub macro entry_point($path:path) {
+    bootloader::entry_point!(kernel_init);
+    fn kernel_init(boot_info: &'static bootloader::BootInfo) -> ! {
+        let entry: fn() -> ! = $path;
+        unsafe {
+            $crate::arch::init(boot_info);
         }
-    };
+        entry()
+    }
 }
 
 #[allow(clippy::inline_always)]

@@ -8,7 +8,7 @@
 extern crate alloc;
 
 use core::panic::PanicInfo;
-use hakkero::{entry_point, serial_print, serial_println, test};
+use hakkero::{arch::entry_point, serial_print, serial_println, test};
 
 entry_point!(main);
 

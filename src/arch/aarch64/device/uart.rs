@@ -16,7 +16,6 @@ impl fmt::Write for UART {
 }
 
 #[doc(hidden)]
-#[inline(always)]
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
 

@@ -1,13 +1,15 @@
 [env.aarch64]
 arch = "aarch64"
 board = "raspi3"
-RUSTFLAGS = "--cfg board=\"${board}\""
+RUSTFLAGS = "-Z macro-backtrace --cfg board=\"${board}\""
 
 [env.x86_64]
 arch = "x86_64"
+RUSTFLAGS = "-Z macro-backtrace"
 
 [env.development]
 arch = "x86_64"
+RUSTFLAGS = "-Z macro-backtrace"
 
 [env]
 kernel_build = "target/${arch}-hakkero/debug/hakkero"

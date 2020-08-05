@@ -2,9 +2,6 @@
 use crate::serial_println;
 use core::panic::PanicInfo;
 
-#[cfg(test)]
-use crate::entry_point;
-
 pub fn runner(tests: &[&dyn Fn()]) {
     serial_println!("Running {} tests", tests.len());
     for test in tests {
@@ -50,7 +47,7 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
 }
 
 #[cfg(test)]
-entry_point!(kernel_main);
+crate::arch::entry_point!(kernel_main);
 
 /// Entry point for `cargo xtest`
 #[cfg(test)]

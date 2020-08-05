@@ -23,6 +23,7 @@ extern crate alloc;
 
 pub mod allocator;
 pub mod arch;
+pub mod logger;
 pub mod memory;
 pub mod misc;
 pub mod task;
