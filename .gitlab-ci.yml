@@ -11,7 +11,7 @@ stages:
 
 # Setup qemu, nightly compiler and cargo tools
 before_script:
-    - apt-get update && apt-get install -yqq --no-install-recommends qemu-system-x86 qemu-system-arm
+    - apt-get update
     - rustup component add rust-src llvm-tools-preview
     - cargo install bootimage cargo-xbuild cargo-make
     - rustc --version && cargo --version
@@ -23,8 +23,9 @@ check-x86_64:
     paths:
         - ./target
   script:
-    - cargo make lint
-    - cargo make test
+    - apt-get install -yqq --no-install-recommends qemu-system-x86
+    - cargo xclippy --target "targets/x86_64-hakkero.json"
+    - cargo xtest --target "targets/x86_64-hakkero.json"
 
 check-aarch64:
   stage: check
@@ -33,4 +34,5 @@ check-aarch64:
     paths:
         - ./target
   script:
-    - cargo make -p aarch64 lint
+    - apt-get install -yqq --no-install-recommends qemu-system-arm
+    - RUST_FLAGS="-Z macro-backtrace -C board=\"virt\"" cargo xclippy --target "targets/aarch64-hakkero.json"
