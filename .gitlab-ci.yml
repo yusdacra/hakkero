@@ -23,6 +23,7 @@ check-x86_64:
     paths:
         - ./target
   script:
+    - rustup component add rust-src llvm-tools-preview
     - apt-get install -yqq --no-install-recommends qemu-system-x86
     - cargo xclippy --target "targets/x86_64-hakkero.json"
     - cargo xtest --target "targets/x86_64-hakkero.json"
@@ -34,5 +35,6 @@ check-aarch64:
     paths:
         - ./target
   script:
+    - rustup component add rust-src llvm-tools-preview
     - apt-get install -yqq --no-install-recommends qemu-system-arm
     - RUST_FLAGS="-Z macro-backtrace -C board=\"virt\"" cargo xclippy --target "targets/aarch64-hakkero.json"
