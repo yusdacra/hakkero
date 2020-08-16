@@ -12,10 +12,8 @@ extern crate alloc;
 
 #[cfg(target_arch = "x86_64")]
 use hakkero::{
-    arch::{
-        device::vga::Readline,
-        task::{handle_scancodes, DecodedKeyStream},
-    },
+    arch::device::vga::Readline,
+    task::keyboard::{handle_scancodes, DecodedKeyStream},
     task::{spawn_task, Executor, Task},
 };
 

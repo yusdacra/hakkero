@@ -5,6 +5,7 @@ use core::task::{Context, Poll};
 use core::{future, pin::Pin};
 
 pub mod executor;
+pub mod keyboard;
 pub mod simple_executor;
 
 pub use executor::{spawn_task, Executor};

@@ -5,6 +5,7 @@ pub mod device;
 pub mod register;
 
 pub use asm::hang_cpu;
+pub use device::uart::{serial_print, serial_println};
 
 use core::ops::Range;
 

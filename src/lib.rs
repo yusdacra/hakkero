@@ -28,3 +28,8 @@ pub mod memory;
 pub mod misc;
 pub mod task;
 pub mod test;
+
+#[cfg(target_arch = "x86_64")]
+pub use arch::{print, print_colored, println, println_colored, serial_print, serial_println};
+#[cfg(target_arch = "aarch64")]
+pub use arch::{serial_print, serial_println};

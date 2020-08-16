@@ -22,13 +22,10 @@ pub fn _print(args: fmt::Arguments) {
     write!(&mut UART, "{}", args).expect("Could not write to QEMU console!");
 }
 
-#[macro_export]
-macro_rules! serial_print {
-    ($($args:tt)*) => ($crate::arch::device::uart::_print(format_args!($($args)*)));
+pub macro serial_print($($args:tt)*) {
+     $crate::arch::device::uart::_print(format_args!($($args)*));
 }
 
-#[macro_export]
-macro_rules! serial_println {
-    () => ($crate::arch::device::uart::_print(format_args!("\n")));
-    ($($arg:tt)*) => ($crate::arch::device::uart::_print(format_args!("{}\n", format_args!($($arg)*))));
+pub macro serial_println($($arg:tt)*) {
+     $crate::arch::device::uart::_print(format_args!("{}\n", format_args!($($arg)*)));
 }

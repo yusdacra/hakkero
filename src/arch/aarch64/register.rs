@@ -9,7 +9,7 @@ pub fn core_id() -> u8 {
 macro_rules! read {
     ($size:ty, $name:tt) => {
         #[allow(clippy::inline_always)]
-        #[inline(always)]
+        #[inline(always)] // Just an asm instruction, should always be inlined
         pub fn read() -> $size {
             let value;
             unsafe {
@@ -23,7 +23,7 @@ macro_rules! read {
 macro_rules! write {
     ($size:ty, $name:tt) => {
         #[allow(clippy::inline_always)]
-        #[inline(always)]
+        #[inline(always)] // Just an asm instruction, should always be inlined
         pub fn write(value: $size) {
             unsafe {
                 asm!(concat!("msr ", $name, ", {}"), in(reg) value);
@@ -35,7 +35,7 @@ macro_rules! write {
 macro_rules! set {
     ($size:ty, $name:tt) => {
         #[allow(clippy::inline_always)]
-        #[inline(always)]
+        #[inline(always)] // Just an asm instruction, should always be inlined
         pub fn set(fields: $size) {
             write(read() | fields);
         }
@@ -45,7 +45,7 @@ macro_rules! set {
 macro_rules! get {
     ($size:ty, $name:tt) => {
         #[allow(clippy::inline_always)]
-        #[inline(always)]
+        #[inline(always)] // Just an asm instruction, should always be inlined
         pub fn get(fields: $size) -> $size {
             read() & fields
         }
@@ -55,7 +55,7 @@ macro_rules! get {
 macro_rules! clear {
     ($size:ty, $name:tt) => {
         #[allow(clippy::inline_always)]
-        #[inline(always)]
+        #[inline(always)] // Just an asm instruction, should always be inlined
         pub fn clear(fields: $size) {
             set(!fields);
         }
@@ -65,7 +65,7 @@ macro_rules! clear {
 macro_rules! is_all_set {
     ($size:ty, $name:tt) => {
         #[allow(clippy::inline_always)]
-        #[inline(always)]
+        #[inline(always)] // Just an asm instruction, should always be inlined
         pub fn is_all_set(fields: $size) -> bool {
             read() & fields == fields
         }
@@ -75,7 +75,7 @@ macro_rules! is_all_set {
 macro_rules! is_any_set {
     ($size:ty, $name:tt) => {
         #[allow(clippy::inline_always)]
-        #[inline(always)]
+        #[inline(always)] // Just an asm instruction, should always be inlined
         pub fn is_any_set(fields: $size) -> bool {
             read() & fields != 0
         }

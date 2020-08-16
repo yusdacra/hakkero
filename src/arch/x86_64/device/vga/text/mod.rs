@@ -1,13 +1,20 @@
 pub mod readline;
 
 use crate::arch::x86_64::woint;
-use core::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+use spinning_top::Spinlock;
 use vga::{
     colors::{Color16, TextModeColor},
     writers::{Screen, ScreenCharacter, Text80x25, TextWriter},
 };
 
-static mut WRITER: Writer = Writer::new();
+static WRITER: Spinlock<Writer> = Spinlock::new(Writer::new());
+
+/// Initializes the `WRITER`.
+pub fn init() {
+    log::trace!("Initializing VGA writer...");
+    WRITER.lock().init();
+    log::info!("Successfully initialized VGA writer!");
+}
 
 const HEIGHT: usize = Text80x25::HEIGHT;
 const WIDTH: usize = Text80x25::WIDTH;
@@ -15,20 +22,20 @@ const BG_COLOR: Color16 = Color16::Black;
 const FG_COLOR: Color16 = Color16::White;
 
 struct WriterColor {
-    colors: AtomicU8,
+    colors: u8,
 }
 
 impl WriterColor {
-    fn set_colors(&self, colors: (Color16, Color16)) {
-        self.colors.store(Self::encode(colors), Ordering::Relaxed);
+    fn set_colors(&mut self, colors: (Color16, Color16)) {
+        self.colors = Self::encode(colors);
     }
 
     fn get_colors(&self) -> (Color16, Color16) {
-        Self::decode(self.colors.load(Ordering::Relaxed)).unwrap()
+        Self::decode(self.colors).unwrap()
     }
 
     fn get_text_color(&self) -> TextModeColor {
-        let colors = Self::decode(self.colors.load(Ordering::Relaxed)).unwrap();
+        let colors = Self::decode(self.colors).unwrap();
         TextModeColor::new(colors.0, colors.1)
     }
 
@@ -67,37 +74,55 @@ impl WriterColor {
 
 /// A writer type that allows writing ASCII bytes and strings using.
 ///
-/// Wraps lines at `size.x`. Supports newline characters and implements the
+/// Wraps lines at ``. Supports newline characters and implements the
 /// `core::fmt::Write` trait.
 pub struct Writer {
     color: WriterColor,
-    x_pos: AtomicUsize,
+    x_pos: usize,
     iw: Text80x25,
+    is_init: bool,
 }
 
 impl Writer {
     /// Creates a new `Writer`.
     pub const fn new() -> Self {
         Self {
-            color: WriterColor {
-                colors: AtomicU8::new(0xF << 4),
-            },
-            x_pos: AtomicUsize::new(0),
+            color: WriterColor { colors: 0xF << 4 },
+            x_pos: 0,
             iw: Text80x25::new(),
+            is_init: false,
         }
     }
 
-    pub fn init(&self) {
+    pub fn init(&mut self) {
         self.iw.set_mode();
+        self.iw
+            .fill_screen(ScreenCharacter::new(b' ', self.color.get_text_color()));
+        self.is_init = true;
     }
 
     /// Writes an ASCII byte to the buffer at current position.
-    fn write_byte(&self, byte: u8) {
+    fn write_byte(&mut self, byte: u8) {
+        if self.x_pos >= WIDTH {
+            self.new_line();
+        }
+        let wb = match byte {
+            // printable ASCII byte
+            0x20..=0x7e => byte,
+            // newline
+            b'\n' => {
+                self.new_line();
+                return; // here to skip x offset
+            }
+            // not part of printable ASCII range
+            _ => 0xfe,
+        };
         self.iw.write_character(
-            self.x_pos.load(Ordering::Relaxed),
+            self.x_pos,
             HEIGHT - 1,
-            ScreenCharacter::new(byte, self.color.get_text_color()),
+            ScreenCharacter::new(wb, self.color.get_text_color()),
         );
+        self.x_pos += 1;
     }
 
     /// Writes the given ASCII string to the buffer.
@@ -105,30 +130,16 @@ impl Writer {
     /// Wraps lines at `size.x`. Supports the `\n` newline character. Does **not**
     /// support strings with non-ASCII characters, since they can't be printed in the VGA text
     /// mode.
-    fn write_string(&self, s: &str) {
+    fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
-            match byte {
-                // printable ASCII byte
-                0x20..=0x7e => self.write_byte(byte),
-                // newline
-                b'\n' => {
-                    self.new_line();
-                    continue; // here to skip x offset
-                }
-                // not part of printable ASCII range
-                _ => self.write_byte(0xfe),
-            }
-            if self.x_pos.fetch_add(1, Ordering::Relaxed) >= WIDTH {
-                self.new_line();
-            }
+            self.write_byte(byte);
         }
         // Update cursor position
-        self.iw
-            .set_cursor_position(self.x_pos.load(Ordering::Relaxed), HEIGHT - 1);
+        self.iw.set_cursor_position(self.x_pos, HEIGHT - 1);
     }
 
     /// Clears a line by overwriting it with a blank character.
-    fn clear_line(&self, y: usize) {
+    fn clear_line(&mut self, y: usize) {
         for x in 0..WIDTH {
             self.iw.write_character(
                 x,
@@ -139,7 +150,7 @@ impl Writer {
     }
 
     /// Clears the last line and shifts all lines one line upwards.
-    fn new_line(&self) {
+    fn new_line(&mut self) {
         for y in 1..HEIGHT {
             for x in 0..WIDTH {
                 let character = self.iw.read_character(x, y);
@@ -147,7 +158,7 @@ impl Writer {
             }
         }
         self.clear_line(HEIGHT - 1);
-        self.x_pos.store(0, Ordering::Relaxed);
+        self.x_pos = 0;
     }
 }
 
@@ -158,39 +169,36 @@ impl core::fmt::Write for Writer {
     }
 }
 
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::arch::device::vga::text::_print(format_args!($($arg)*)));
+pub macro print($($arg:tt)*) {
+    $crate::arch::device::vga::text::_print(format_args!($($arg)*));
 }
 
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+pub macro println($($arg:tt)*) {
+    $crate::print!("{}\n", format_args!($($arg)*));
 }
 
-#[macro_export]
-macro_rules! print_colored {
-    ($color:expr, $($arg:tt)*) => ($crate::arch::device::vga::text::_print_colored($color, format_args!($($arg)*)));
+pub macro print_colored($color:expr, $($arg:tt)*) {
+    $crate::arch::device::vga::text::_print_colored($color, format_args!($($arg)*));
 }
 
-#[macro_export]
-macro_rules! println_colored {
-    ($color:expr) => ($crate::print_colored!($color, "\n"));
-    ($color:expr, $($arg:tt)*) => ($crate::print_colored!($color, "{}\n", format_args!($($arg)*)));
+pub macro println_colored($color:expr, $($arg:tt)*) {
+    $crate::print_colored!($color, "{}\n", format_args!($($arg)*));
 }
 
 #[doc(hidden)]
 pub fn _print_colored(colors: (Color16, Color16), args: core::fmt::Arguments) {
     use core::fmt::Write;
 
+    let mut writer = WRITER.lock();
+    if !writer.is_init {
+        return;
+    }
+
     woint(|| {
-        let old_colors = unsafe { &WRITER }.color.get_colors();
-        unsafe { &WRITER }.color.set_colors(colors);
-        // This isn't actually "unsafe" because we dont mutate anything in `write_string` function
-        write!(unsafe { &mut WRITER }, "{}", args)
-            .expect("failed to write to vga buffer (literally how)");
-        unsafe { &WRITER }.color.set_colors(old_colors);
+        let old_colors = writer.color.get_colors();
+        writer.color.set_colors(colors);
+        write!(&mut writer, "{}", args).expect("failed to write to vga buffer (literally how)");
+        writer.color.set_colors(old_colors);
     });
 }
 
@@ -198,9 +206,13 @@ pub fn _print_colored(colors: (Color16, Color16), args: core::fmt::Arguments) {
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
 
+    let mut writer = WRITER.lock();
+    if !writer.is_init {
+        return;
+    }
+
     woint(|| {
-        write!(unsafe { &mut WRITER }, "{}", args)
-            .expect("failed to write to vga buffer (literally how)")
+        write!(&mut writer, "{}", args).expect("failed to write to vga buffer (literally how)")
     });
 }
 
@@ -215,8 +227,9 @@ fn test_println_output() {
 
     let s = "1234567890";
     println!("\n{}", s);
+    let writer = WRITER.lock();
     for (i, c) in s.chars().enumerate() {
-        let screen_char = unsafe { &WRITER }.iw.read_character(i, HEIGHT - 2);
+        let screen_char = writer.iw.read_character(i, HEIGHT - 2);
         assert_eq!(screen_char.get_character(), c as u8);
     }
 
@@ -230,8 +243,9 @@ fn test_println_colored_output() {
     let s = "1234567890";
     let colors = (Color16::Black, Color16::Brown);
     println_colored!(colors, "\n{}", s);
+    let writer = WRITER.lock();
     for (i, c) in s.chars().enumerate() {
-        let screen_char = unsafe { &WRITER }.iw.read_character(i, HEIGHT - 2);
+        let screen_char = writer.iw.read_character(i, HEIGHT - 2);
         assert_eq!(screen_char.get_character(), c as u8);
         assert_eq!(
             screen_char.get_color(),
@@ -249,11 +263,13 @@ fn test_println_fit_line_output() {
     for _ in 0..WIDTH {
         print!("a");
     }
+
+    let writer = WRITER.lock();
     assert_eq!(
         char::from(
-            unsafe { &WRITER }
+            writer
                 .iw
-                .read_character(unsafe { &WRITER }.x_pos.load(Ordering::Relaxed), HEIGHT - 1)
+                .read_character(writer.x_pos, HEIGHT - 1)
                 .get_character()
         ),
         ' '

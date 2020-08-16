@@ -3,6 +3,7 @@ pub mod uart16550;
 pub mod vga;
 
 pub fn init() {
-    pic8259::init();
     uart16550::init();
+    vga::text::init();
+    pic8259::init();
 }

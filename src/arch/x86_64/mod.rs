@@ -3,7 +3,11 @@ pub mod device;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
-pub mod task;
+
+pub use device::{
+    uart16550::{serial_print, serial_println},
+    vga::text::{print, print_colored, println, println_colored},
+};
 
 use bootloader::BootInfo;
 

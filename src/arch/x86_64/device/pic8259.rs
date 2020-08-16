@@ -8,8 +8,10 @@ static PICS: Spinlock<ChainedPics> =
     Spinlock::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 
 pub fn init() {
+    log::trace!("Initalizing PIC 8529...");
     unsafe { PICS.lock().initialize() };
     x86_64::instructions::interrupts::enable();
+    log::info!("Successfully initialized PIC 8529!");
 }
 
 /// Convenience function to notify the end of an interrupt.
@@ -43,7 +45,7 @@ pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: &mut Interru
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: &mut InterruptStackFrame) {
     let mut port = x86_64::instructions::port::PortReadOnly::new(0x60);
     let scancode: u8 = unsafe { port.read() };
-    super::super::task::keyboard::add_scancode(scancode);
+    crate::task::keyboard::add_scancode(scancode);
 
     send_eoi(InterruptIndex::Keyboard);
 }
