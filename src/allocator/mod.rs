@@ -51,6 +51,6 @@ impl<A> Locked<A> {
 ///
 /// # Safety
 /// `align` must be a power of two.
-unsafe fn align_up(addr: usize, align: usize) -> usize {
+const unsafe fn align_up(addr: usize, align: usize) -> usize {
     (addr + align - 1) & !(align - 1)
 }

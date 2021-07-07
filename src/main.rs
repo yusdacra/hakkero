@@ -12,11 +12,8 @@ extern crate alloc;
 
 #[cfg(target_arch = "x86_64")]
 use hakkero::{
-    arch::{
-        device::vga::Readline,
-        task::{handle_scancodes, DecodedKeyStream},
-    },
-    task::{spawn_task, Executor, Task},
+    arch::task::{handle_scancodes, DecodedKeyStream},
+    task::{self, Executor, Task},
 };
 
 // NOTE: All supported architectures must have entry_point implemented!
@@ -58,17 +55,24 @@ fn heap_info() {
 
 #[cfg(target_arch = "x86_64")]
 async fn start_handlers() {
-    spawn_task(Task::new(handle_scancodes())).unwrap();
-    spawn_task(Task::new(async {
+    use pc_keyboard::DecodedKey;
+
+    log::info!("starting services");
+    task::spawn(Task::new(handle_scancodes())).unwrap();
+    log::info!("handle keyboard scancodes started");
+    task::spawn(Task::new(async {
         use futures_util::stream::StreamExt;
 
         let mut queue = DecodedKeyStream;
-        let mut rl = Readline::new();
 
         while let Some(key) = queue.next().await {
-            if let Some(s) = rl.handle_key(key) {
-                hakkero::println!("{}", s);
-            }
+            hakkero::print!(
+                "{}",
+                match key {
+                    DecodedKey::Unicode(b) => b,
+                    _ => ' ',
+                }
+            );
         }
     }))
     .unwrap();

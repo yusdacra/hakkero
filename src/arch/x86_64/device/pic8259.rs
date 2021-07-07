@@ -8,7 +8,9 @@ static PICS: Mutex<ChainedPics> =
     Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 
 pub fn init() {
-    unsafe { PICS.lock().initialize() };
+    unsafe {
+        PICS.lock().initialize();
+    };
     x86_64::instructions::interrupts::enable();
 }
 
@@ -27,12 +29,12 @@ pub enum InterruptIndex {
 }
 
 impl InterruptIndex {
-    pub fn as_u8(self) -> u8 {
+    pub const fn as_u8(self) -> u8 {
         self as u8
     }
 
-    pub fn as_usize(self) -> usize {
-        usize::from(self.as_u8())
+    pub const fn as_usize(self) -> usize {
+        self.as_u8() as usize
     }
 }
 

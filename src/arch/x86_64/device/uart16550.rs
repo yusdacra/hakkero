@@ -15,16 +15,9 @@ pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
 
     woint(|| {
-        write!(
-            &mut if let Some(g) = COM1.try_lock() {
-                g
-            } else {
-                return;
-            },
-            "{}",
-            args
-        )
-        .expect("Printing to serial failed")
+        if let Some(mut g) = COM1.try_lock() {
+            write!(&mut *g, "{}", args).expect("Printing to serial failed");
+        }
     });
 }
 

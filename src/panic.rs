@@ -6,7 +6,7 @@ use core::panic::PanicInfo;
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    hakkero::serial_println!("{}", info);
+    log::error!("{}", info);
     hakkero::arch::hang_cpu();
 }
 

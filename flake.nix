@@ -7,6 +7,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flakeCompat = {
+      url = "github:edolstra/flake-compat";
+      flake = false;
+    };
   };
 
   outputs = inputs: inputs.nixCargoIntegration.lib.makeOutputs {

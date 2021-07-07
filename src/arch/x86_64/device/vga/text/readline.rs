@@ -1,26 +1,19 @@
-use super::{BG_COLOR, FG_COLOR, HEIGHT, WIDTH};
 use pc_keyboard::DecodedKey;
 use smallstr::SmallString;
-use vga::{
-    colors::TextModeColor,
-    writers::{ScreenCharacter, Text80x25, TextWriter},
-};
+
+const WIDTH: usize = 80;
 
 pub struct Readline {
     buf: SmallString<[u8; WIDTH]>,
     pos: usize,
-    iw: Text80x25,
 }
 
 #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
 impl Readline {
     pub fn new() -> Self {
-        let iw = Text80x25::new();
-        iw.set_mode();
         Self {
             buf: SmallString::with_capacity(WIDTH),
             pos: 0,
-            iw,
         }
     }
 

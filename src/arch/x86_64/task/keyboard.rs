@@ -45,7 +45,7 @@ pub fn add_scancode(scancode: u8) {
     if let Some(queue) = SCANCODES.get() {
         if queue.push(scancode).is_err() {
             warn!("scancode queue full, clearing queue to avoid dropping keyboard input");
-            clear_array_queue(&queue);
+            clear_array_queue(queue);
         } else {
             SCANCODES_WAKER.wake();
         }
@@ -92,7 +92,7 @@ impl Stream for ScancodeStream {
             return Poll::Ready(Some(scancode));
         }
 
-        SCANCODES_WAKER.register(&cx.waker());
+        SCANCODES_WAKER.register(cx.waker());
         match queue.pop() {
             Some(scancode) => {
                 SCANCODES_WAKER.take();
@@ -120,7 +120,7 @@ impl Stream for DecodedKeyStream {
             return Poll::Ready(Some(key));
         }
 
-        DECODED_KEYS_WAKER.register(&cx.waker());
+        DECODED_KEYS_WAKER.register(cx.waker());
         match queue.pop() {
             Some(key) => {
                 DECODED_KEYS_WAKER.take();

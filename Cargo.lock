@@ -48,21 +48,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "conquer-once"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c6d3a9775a69f6d1fe2cc888999b67ed30257d3da4d2af91984e722f2ec918a"
-dependencies = [
- "conquer-util",
-]
-
-[[package]]
-name = "conquer-util"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e763eef8846b13b380f37dfecda401770b0ca4e56e95170237bd7c25c7db3582"
-
-[[package]]
 name = "crossbeam-queue"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -118,6 +103,7 @@ version = "0.1.0"
 dependencies = [
  "bootloader",
  "crossbeam-queue",
+ "font8x8",
  "futures-util",
  "linked_list_allocator",
  "log",
@@ -127,7 +113,6 @@ dependencies = [
  "smallvec",
  "spin",
  "uart_16550",
- "vga",
  "x86_64",
 ]
 
@@ -162,15 +147,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "num-traits"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
-dependencies = [
- "autocfg",
 ]
 
 [[package]]
@@ -246,20 +222,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65ad019480ef5ff8ffe66d6f6a259cd87cf317649481394981db1739d844f374"
 dependencies = [
  "bitflags",
- "x86_64",
-]
-
-[[package]]
-name = "vga"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67cbcb7bfff998d176ffb8f2c3dfd6cb0fe62740e36dee6c64fc3928c01001bf"
-dependencies = [
- "bitflags",
- "conquer-once",
- "font8x8",
- "num-traits",
- "spinning_top",
  "x86_64",
 ]
 

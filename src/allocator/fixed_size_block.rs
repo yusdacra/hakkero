@@ -48,15 +48,13 @@ impl Allocator {
 
     /// Calculates how much of the heap is used.
     pub fn used_heap(&self) -> usize {
+        #[allow(clippy::ref_option_ref)]
         fn follow_list_head<'a>(
             head: &Option<&'a mut ListNode>,
             count: usize,
         ) -> (&'a Option<&'a mut ListNode>, usize) {
-            if let Some(h) = head {
-                follow_list_head(&h.next, count + 1)
-            } else {
-                (&None, count)
-            }
+            head.as_ref()
+                .map_or((&None, count), |h| follow_list_head(&h.next, count + 1))
         }
 
         let mut res = self.fallback_allocator.used();
@@ -79,10 +77,11 @@ fn list_index(layout: &Layout) -> Option<usize> {
 unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let mut allocator = self.lock();
+        #[allow(clippy::option_if_let_else)]
         if let Some(index) = list_index(&layout) {
             if let Some(node) = allocator.list_heads[index].take() {
                 allocator.list_heads[index] = node.next.take();
-                node as *mut ListNode as *mut u8
+                (node as *mut ListNode).cast::<u8>()
             } else {
                 // No block exists in list => allocate new block
                 let block_size = BLOCK_SIZES[index];
@@ -106,7 +105,7 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
             assert!(mem::size_of::<ListNode>() <= BLOCK_SIZES[index]);
             assert!(mem::align_of::<ListNode>() <= BLOCK_SIZES[index]);
             #[allow(clippy::cast_ptr_alignment)]
-            let new_node_ptr = ptr as *mut ListNode;
+            let new_node_ptr = ptr.cast::<ListNode>();
             new_node_ptr.write(new_node);
             allocator.list_heads[index] = Some(&mut *new_node_ptr);
         } else {

@@ -167,7 +167,7 @@ use crate::{serial_print, serial_println};
 #[test_case]
 fn test_task_spawn_exec() {
     serial_print!("test_task_spawn_exec... ");
-    let executor = Executor::new().spawn(Task::new(async { () }));
+    let executor = Executor::new().spawn(Task::new(async {}));
     assert!(executor.task_queue.front().is_some());
     serial_println!("[ok]");
 }

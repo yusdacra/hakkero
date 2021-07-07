@@ -45,18 +45,8 @@ impl Log for Logger {
 
             #[cfg(all(target_arch = "x86_64", feature = "log_vga"))]
             {
-                use log::Level;
-                use vga::colors::Color16;
-
-                let color = match record.level() {
-                    Level::Error => (Color16::Black, Color16::Red),
-                    Level::Warn => (Color16::Yellow, Color16::Black),
-                    Level::Info => (Color16::LightBlue, Color16::Black),
-                    _ => (Color16::White, Color16::Black),
-                };
                 #[cfg(debug_assertions)]
-                crate::println_colored!(
-                    color,
+                crate::println!(
                     "[{}:{}] [{}] {}",
                     file_path,
                     line_number,
@@ -64,7 +54,7 @@ impl Log for Logger {
                     message,
                 );
                 #[cfg(not(debug_assertions))]
-                crate::println_colored!(color, "[{}] {}", log_level, message);
+                crate::println!("[{}] {}", log_level, message);
             }
             #[cfg(feature = "log_serial")]
             {

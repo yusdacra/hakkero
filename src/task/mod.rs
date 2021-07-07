@@ -7,7 +7,7 @@ use core::{future, pin::Pin};
 pub mod executor;
 pub mod simple_executor;
 
-pub use executor::{spawn_task, Executor};
+pub use executor::{spawn_task as spawn, Executor};
 
 /// Stores a unique ID that is used by executors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

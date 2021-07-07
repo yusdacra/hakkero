@@ -75,7 +75,7 @@ impl BootInfoFrameAllocator {
     }
 
     /// Returns an iterator over the usable frames specified in the memory map.
-    fn usable_frames<'a>(&'a self) -> impl Iterator<Item = PhysFrame> + 'a {
+    fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> + '_ {
         // get usable regions from memory map
         let regions = self.memory_map.iter();
         let usable_regions = regions.filter(|r| r.kind == MemoryRegionKind::Usable);

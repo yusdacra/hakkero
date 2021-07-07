@@ -51,16 +51,10 @@ bootloader = { git = "https://github.com/yusdacra/bootloader.git", branch = "fix
 pc-keyboard = "0.5"
 pic8259 = "0.10"
 uart_16550 = "0.2"
-vga = "0.2"
+font8x8 = { version = "0.3", default-features = false, features = ["unicode"] }
 x86_64 = "0.14"
 
-[package.metadata.bootimage]
-run-args = [
-    "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
-]
-test-args = [
-    "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
-    "-display", "none"
-]
-test-success-exit-code = 33         # (0x10 << 1) | 1
+[package.metadata.bootloader]
+map-physical-memory = true
+map-framebuffer = true
 
