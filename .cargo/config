@@ -9,3 +9,7 @@ kb64 = """build --target targets/x86_64-hakkero.json -Z build-std=core,alloc -Z 
 kc64 = """check --target targets/x86_64-hakkero.json -Z build-std=core -Z build-std-features=compiler-builtins-mem"""
 kd64 = """doc --target targets/x86_64-hakkero.json -Z build-std=core -Z build-std-features=compiler-builtins-mem"""
 kt64 = """test --target targets/x86_64-hakkero.json -Z build-std=core -Z build-std-features=compiler-builtins-mem"""
+kbarm = """build --target targets/aarch64-hakkero.json -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem"""
+kcarm = """check --target targets/aarch64-hakkero.json -Z build-std=core -Z build-std-features=compiler-builtins-mem"""
+kdarm = """doc --target targets/aarch64-hakkero.json -Z build-std=core -Z build-std-features=compiler-builtins-mem"""
+ktarm = """test --target targets/aarch64-hakkero.json -Z build-std=core -Z build-std-features=compiler-builtins-mem"""

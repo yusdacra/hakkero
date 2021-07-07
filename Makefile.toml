@@ -20,36 +20,52 @@ kernel_binary = "target/${arch}-hakkero/debug/hakkero.bin"
 target_file = "targets/${arch}-hakkero.json"
 CARGO_MANIFEST_DIR = "."
 
-[tasks.lint]
-category = "Tools"
-description = "Lint the project."
-install_crate = false
+[tasks.lint-x86_64]
+condition = { env = { arch = "x86_64" } }
 command = "cargo"
 args = ["kc64"]
 
-[tasks.build]
-clear = true
-category = "Build"
-description = "Builds the project using xbuild."
+[tasks.build-x86_64]
+condition = { env = { arch = "x86_64" } }
 install_crate = false
 command = "cargo"
 args = ["kb64"]
 
-[tasks.doc]
-clear = true
-category = "Tools"
-description = "Documents the project using xdoc."
+[tasks.doc-x86_64]
+condition = { env = { arch = "x86_64" } }
 install_crate = false
 command = "cargo"
 args = ["kd64"]
 
-[tasks.test]
-clear = true
-category = "Test"
-description = "Test the project using xtest."
+[tasks.test-x86_64]
+condition = { env = { arch = "x86_64" } }
 install_crate = false
 command = "cargo"
 args = ["kt64"]
+
+[tasks.lint-aarch64]
+condition = { env = { arch = "aarch64" } }
+install_crate = false
+command = "cargo"
+args = ["kcarm"]
+
+[tasks.build-aarch64]
+condition = { env = { arch = "aarch64" } }
+install_crate = false
+command = "cargo"
+args = ["kbarm"]
+
+[tasks.doc-aarch64]
+condition = { env = { arch = "aarch64" } }
+install_crate = false
+command = "cargo"
+args = ["kdarm"]
+
+[tasks.test-aarch64]
+condition = { env = { arch = "aarch64" } }
+install_crate = false
+command = "cargo"
+args = ["ktarm"]
 
 [tasks.run]
 category = "Build"
@@ -64,7 +80,7 @@ args = [
  	"-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
  	"-serial", "stdio"
 ]
-dependencies = [ "build", "create-bootimage" ]
+dependencies = [ "build-x86_64", "create-bootimage" ]
 
 [tasks.run-aarch64]
 condition = { env = { arch = "aarch64" }, env_set = [ "board" ] }
@@ -75,7 +91,7 @@ args = [
  	"-display", "none",
  	"-kernel", "${kernel_binary}"
 ]
-dependencies = [ "build", "translate-to-binary" ]
+dependencies = [ "translate-to-binary" ]
 
 [tasks.create-bootimage]
 condition = { env = { arch = "x86_64" } }
@@ -86,7 +102,7 @@ args = [ "run", "--package", "boot" ]
 condition = { env = { arch = "aarch64" } }
 command = "rust-objcopy"
 args = [ "-O", "binary", "${kernel_build}", "${kernel_binary}" ]
-dependencies = [ "build" ]
+dependencies = [ "build-aarch64" ]
 
 [tasks.disasm]
 category = "Tools"
@@ -95,7 +111,7 @@ script_runner = "@shell"
 script = [
 	"rust-objdump --disassemble-all ${kernel_build} | less"
 ]
-dependencies = [ "build" ]
+dependencies = [ "build-aarch64", "build-x86_64" ]
 
 [tasks.default]
 description = "Development testing flow will first format and lint the code, and then run cargo build and test"
