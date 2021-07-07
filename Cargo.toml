@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Yusuf Bera Ertan <y.bera003.06@protonmail.com>"]
 edition = "2018"
 
+[workspace]
+members = ["boot"]
+
 [[test]]
 name = "should_panic"
 harness = false
@@ -25,31 +28,31 @@ log_vga = []
 log_serial = []
 
 [dependencies]
-linked_list_allocator = "^0.8"
-log = "^0.4"
-smallvec = { version = "^1.4", features = ["union", "const_generics"] }
-smallstr = { version = "^0.2", features = ["union"] }
-spinning_top = "^0.1"
+linked_list_allocator = "0.9"
+log = "0.4"
+smallvec = { version = "1.6", features = ["union", "const_generics"] }
+smallstr = { version = "0.2", features = ["union"] }
+spin = { version = "0.9", features = ["once", "mutex"] }
 
 [dependencies.crossbeam-queue]
 default-features = false
 features = ["alloc"]
-version = "^0.2"
+version = "0.3"
 
 [dependencies.futures-util]
 default-features = false
 features = ["alloc"]
-version = "^0.3"
+version = "0.3"
 
 # x86_64 specific stuff
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-bootloader = { version = "^0.9", features = ["map_physical_memory"] }
-pc-keyboard = "^0.5"
-pic8259_simple = "^0.2"
-uart_16550 = "^0.2"
-vga = "^0.2"
-x86_64 = "^0.11"
+bootloader = { git = "https://github.com/yusdacra/bootloader.git", branch = "fix/dependency-detection" }
+pc-keyboard = "0.5"
+pic8259 = "0.10"
+uart_16550 = "0.2"
+vga = "0.2"
+x86_64 = "0.14"
 
 [package.metadata.bootimage]
 run-args = [
@@ -60,3 +63,4 @@ test-args = [
     "-display", "none"
 ]
 test-success-exit-code = 33         # (0x10 << 1) | 1
+

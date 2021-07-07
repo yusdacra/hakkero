@@ -1,11 +1,11 @@
-use pic8259_simple::ChainedPics;
-use spinning_top::Spinlock;
+use pic8259::ChainedPics;
+use spin::Mutex;
 use x86_64::structures::idt::InterruptStackFrame;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
-static PICS: Spinlock<ChainedPics> =
-    Spinlock::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
+static PICS: Mutex<ChainedPics> =
+    Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 
 pub fn init() {
     unsafe { PICS.lock().initialize() };
@@ -36,11 +36,11 @@ impl InterruptIndex {
     }
 }
 
-pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: &mut InterruptStackFrame) {
+pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
     send_eoi(InterruptIndex::Timer);
 }
 
-pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: &mut InterruptStackFrame) {
+pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
     let mut port = x86_64::instructions::port::PortReadOnly::new(0x60);
     let scancode: u8 = unsafe { port.read() };
     super::super::task::keyboard::add_scancode(scancode);

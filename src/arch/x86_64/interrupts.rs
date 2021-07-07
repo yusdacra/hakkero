@@ -2,7 +2,7 @@ use super::{
     device::pic8259::{self, keyboard_interrupt_handler, timer_interrupt_handler},
     gdt,
 };
-use crate::misc::Once;
+use spin::Once;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
@@ -20,22 +20,22 @@ pub unsafe fn init_idt() {
         .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
     idt[pic8259::InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
     idt[pic8259::InterruptIndex::Keyboard.as_usize()].set_handler_fn(keyboard_interrupt_handler);
-    IDT.try_init(idt).load();
+    IDT.call_once(|| idt).load();
 }
 
-extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
     log::info!("EXPECTION: BREAKPOINT\n{:#?}", stack_frame);
 }
 
 extern "x86-interrupt" fn double_fault_handler(
-    stack_frame: &mut InterruptStackFrame,
+    stack_frame: InterruptStackFrame,
     _error_code: u64,
 ) -> ! {
     panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
 }
 
 extern "x86-interrupt" fn page_fault_handler(
-    stack_frame: &mut InterruptStackFrame,
+    stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
     panic!(

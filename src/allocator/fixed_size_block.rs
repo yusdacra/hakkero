@@ -23,7 +23,7 @@ impl Allocator {
     /// Creates an empty `FixedSizeBlockAllocator`.
     pub const fn new() -> Self {
         Allocator {
-            list_heads: [None; BLOCK_SIZES.len()],
+            list_heads: [None, None, None, None, None, None, None, None, None],
             fallback_allocator: linked_list_allocator::Heap::empty(),
         }
     }

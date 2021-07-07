@@ -1,4 +1,4 @@
-use crate::misc::Once;
+use spin::Once;
 use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector};
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::VirtAddr;
@@ -29,14 +29,16 @@ pub unsafe fn init() {
 
     let mut gdt = GlobalDescriptorTable::new();
     let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
-    let tss_selector = gdt.add_entry(Descriptor::tss_segment(TSS.try_init(tss)));
-    let gdt = GDT.try_init((
-        gdt,
-        Selectors {
-            code_selector,
-            tss_selector,
-        },
-    ));
+    let tss_selector = gdt.add_entry(Descriptor::tss_segment(TSS.call_once(|| tss)));
+    let gdt = GDT.call_once(|| {
+        (
+            gdt,
+            Selectors {
+                code_selector,
+                tss_selector,
+            },
+        )
+    });
 
     gdt.0.load();
     x86_64::instructions::segmentation::set_cs(gdt.1.code_selector);

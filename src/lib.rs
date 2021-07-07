@@ -8,11 +8,9 @@
     abi_x86_interrupt,
     alloc_error_handler,
     naked_functions,
-    const_fn,
-    const_in_array_repeat_expressions,
-    wake_trait,
     trait_alias,
-    maybe_uninit_ref
+    maybe_uninit_ref,
+    const_mut_refs
 )]
 #![reexport_test_harness_main = "test_main"]
 #![test_runner(test::runner)]
@@ -25,6 +23,5 @@ pub mod allocator;
 pub mod arch;
 pub mod logger;
 pub mod memory;
-pub mod misc;
 pub mod task;
 pub mod test;

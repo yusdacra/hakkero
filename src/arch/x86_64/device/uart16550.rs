@@ -1,5 +1,5 @@
 use crate::arch::x86_64::woint;
-use spinning_top::Spinlock;
+use spin::Mutex;
 use uart_16550::SerialPort;
 
 pub fn init() {
@@ -8,7 +8,7 @@ pub fn init() {
 
 pub const COM1_ADDR: u16 = 0x03F8;
 
-static COM1: Spinlock<SerialPort> = Spinlock::new(unsafe { SerialPort::new(COM1_ADDR) });
+static COM1: Mutex<SerialPort> = Mutex::new(unsafe { SerialPort::new(COM1_ADDR) });
 
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {

@@ -1,6 +1,5 @@
 //! Simple FIFO `Task` executor.
 use super::{Task, TaskId};
-use crate::misc::Once;
 use alloc::{
     collections::{BTreeMap, VecDeque},
     sync::Arc,
@@ -8,6 +7,7 @@ use alloc::{
 };
 use core::task::{Context, Poll, Waker};
 use crossbeam_queue::SegQueue;
+use spin::Once;
 
 struct TaskWaker {
     task_id: TaskId,
@@ -69,7 +69,7 @@ impl Executor {
     /// Creates a new `Executor`.
     pub fn new() -> Self {
         let waiting_for_task_queue = Arc::new(SegQueue::new());
-        WFTQ.try_init(waiting_for_task_queue.clone());
+        WFTQ.call_once(|| waiting_for_task_queue.clone());
         Executor {
             task_queue: VecDeque::new(),
             waiting_for_task_queue,
@@ -97,7 +97,7 @@ impl Executor {
 
     #[cfg(target_arch = "x86_64")]
     fn sleep_if_idle(&self) {
-        use x86_64::instructions::interrupts::{self, enable_interrupts_and_hlt};
+        use x86_64::instructions::interrupts;
 
         // Return early, no need to disable interrupts
         if !self.wake_queue.is_empty() {
@@ -107,7 +107,7 @@ impl Executor {
         interrupts::disable();
         // If an interrupt happened inbetween, interrupts will be enabled
         if self.wake_queue.is_empty() {
-            enable_interrupts_and_hlt();
+            interrupts::enable_and_hlt();
         } else {
             interrupts::enable();
         }
@@ -121,7 +121,7 @@ impl Executor {
     }
 
     fn run_ready_tasks(&mut self) {
-        while let Ok(task) = self.waiting_for_task_queue.pop() {
+        while let Some(task) = self.waiting_for_task_queue.pop() {
             self.task_queue.push_back(task);
         }
         while let Some(mut task) = self.task_queue.pop_front() {
@@ -153,7 +153,7 @@ impl Executor {
     }
 
     fn wake_tasks(&mut self) {
-        while let Ok(task_id) = self.wake_queue.pop() {
+        while let Some(task_id) = self.wake_queue.pop() {
             if let Some(task) = self.waiting_tasks.remove(&task_id) {
                 self.task_queue.push_back(task);
             }

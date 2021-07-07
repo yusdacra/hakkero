@@ -1,4 +1,3 @@
-use crate::misc::Once;
 use core::{
     pin::Pin,
     task::{Context, Poll},
@@ -7,6 +6,7 @@ use crossbeam_queue::ArrayQueue;
 use futures_util::stream::{Stream, StreamExt};
 use futures_util::task::AtomicWaker;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
+use spin::Once;
 
 const SC_CAP: usize = 100;
 /// Holds scancodes added by `add_scancode`.
@@ -17,12 +17,12 @@ static DECODED_KEYS: Once<ArrayQueue<DecodedKey>> = Once::new();
 static DECODED_KEYS_WAKER: AtomicWaker = AtomicWaker::new();
 
 fn clear_array_queue<T>(queue: &ArrayQueue<T>) {
-    while queue.pop().is_ok() {}
+    while queue.pop().is_some() {}
 }
 
 /// Handles scancodes asynchronously.
 pub async fn handle_scancodes() {
-    DECODED_KEYS.try_init(ArrayQueue::new(SC_CAP));
+    DECODED_KEYS.call_once(|| ArrayQueue::new(SC_CAP));
 
     let mut scancodes = ScancodeStream::new();
     let mut keyboard = Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore);
@@ -77,7 +77,7 @@ pub struct ScancodeStream {
 
 impl ScancodeStream {
     pub fn new() -> Self {
-        SCANCODES.try_init(ArrayQueue::new(SC_CAP));
+        SCANCODES.call_once(|| ArrayQueue::new(SC_CAP));
         ScancodeStream { _private: () }
     }
 }
@@ -88,17 +88,17 @@ impl Stream for ScancodeStream {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         let queue = SCANCODES.get().expect("not initialized");
 
-        if let Ok(scancode) = queue.pop() {
+        if let Some(scancode) = queue.pop() {
             return Poll::Ready(Some(scancode));
         }
 
         SCANCODES_WAKER.register(&cx.waker());
         match queue.pop() {
-            Ok(scancode) => {
+            Some(scancode) => {
                 SCANCODES_WAKER.take();
                 Poll::Ready(Some(scancode))
             }
-            Err(crossbeam_queue::PopError) => Poll::Pending,
+            None => Poll::Pending,
         }
     }
 }
@@ -116,17 +116,17 @@ impl Stream for DecodedKeyStream {
             return Poll::Pending;
         };
 
-        if let Ok(key) = queue.pop() {
+        if let Some(key) = queue.pop() {
             return Poll::Ready(Some(key));
         }
 
         DECODED_KEYS_WAKER.register(&cx.waker());
         match queue.pop() {
-            Ok(key) => {
+            Some(key) => {
                 DECODED_KEYS_WAKER.take();
                 Poll::Ready(Some(key))
             }
-            Err(crossbeam_queue::PopError) => Poll::Pending,
+            None => Poll::Pending,
         }
     }
 }

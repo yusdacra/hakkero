@@ -1,7 +1,7 @@
 //! Contains allocators and common code for them.
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
-use spinning_top::{Spinlock, SpinlockGuard};
+use spin::{Mutex, MutexGuard};
 
 pub mod bump;
 pub mod fixed_size_block;
@@ -32,17 +32,17 @@ unsafe impl GlobalAlloc for Dummy {
 }
 
 pub struct Locked<A> {
-    inner: Spinlock<A>,
+    inner: Mutex<A>,
 }
 
 impl<A> Locked<A> {
     pub const fn new(inner: A) -> Self {
         Locked {
-            inner: Spinlock::new(inner),
+            inner: Mutex::new(inner),
         }
     }
 
-    pub fn lock(&self) -> SpinlockGuard<A> {
+    pub fn lock(&self) -> MutexGuard<A> {
         self.inner.lock()
     }
 }
